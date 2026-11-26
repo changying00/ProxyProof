@@ -31,6 +31,22 @@ $ curl localhost:5555/stats             # 池子现状
 
 ## 快速开始
 
+### Docker（推荐）
+
+需要 Docker 和 compose v2。更详细的部署说明见 [DOCKER.md](./DOCKER.md)。
+
+```bash
+git clone https://github.com/changying00/ProxyProof.git
+cd ProxyProof
+cp .env.example .env      # 在 .env 里设置 API_KEY（公网必填）和探测目标
+docker compose up -d --build
+curl http://127.0.0.1:5555/random
+```
+
+Redis 随 compose 一起起，数据落在 named volume 里，容器重启后池子不清零。
+
+### 直接跑（Python）
+
 需要 Python >= 3.9、Redis 5.0 及以上（不依赖 6.2 才有的 `ZRANDMEMBER`）。
 
 ```bash

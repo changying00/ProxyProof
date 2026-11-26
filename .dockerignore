@@ -1,0 +1,16 @@
+# 构建上下文里只放代码需要的，别把 .venv（几百 MB）和本地 .env 传进镜像
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.env
+logs
+*.log
+tools/samples
+EVAL_STANDARD.md
+Dockerfile
+docker-compose.yml
+DOCKER.md

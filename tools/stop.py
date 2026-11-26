@@ -44,17 +44,40 @@ def snapshot():
 
 def main():
     procs = snapshot()
+    by_pid = {p["pid"]: p for p in procs}
     marked = set()
 
-    # 1. 命令行含项目路径的 python
+    def is_python(p):
+        return "python" in p["name"].lower()
+
+    # 1. 命令行含项目路径的 python 进程（调度器）
     for p in procs:
-        if "Proxy_Pool" in (p["cmd"] or ""):
+        if is_python(p) and "Proxy_Pool" in (p["cmd"] or ""):
             marked.add(p["pid"])
 
-    # 2. 监听 API 端口的进程 —— spawn 子进程靠这条认领（命令行里没有项目路径）
+    # 2. 监听 API 端口的进程 —— spawn 子进程靠这条认领（命令行里没有项目路径）。
+    #    只认领 python：Docker Desktop 的端口转发进程（com.docker.backend.exe）也监听 5555，
+    #    不筛类型会把整个 Docker 后端当成本项目进程杀掉。
+    #    孤儿场景（调度器已死、子进程还占着端口）用 multiprocessing 签名兜底。
+    def ancestor_is_project(pid):
+        seen = set()
+        cur = pid
+        while cur in by_pid and cur not in seen:
+            seen.add(cur)
+            if cur in marked:
+                return True
+            cur = by_pid[cur]["ppid"]
+        return False
+
     for line in sh(NET).splitlines():
-        if line.strip().isdigit():
-            marked.add(int(line.strip()))
+        if not line.strip().isdigit():
+            continue
+        pid = int(line.strip())
+        p = by_pid.get(pid)
+        if not p or not is_python(p):
+            continue
+        if ancestor_is_project(pid) or "multiprocessing" in (p["cmd"] or ""):
+            marked.add(pid)
 
     changed = True
     while changed:                      # 3. 递归收集子孙

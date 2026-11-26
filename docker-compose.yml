@@ -1,0 +1,41 @@
+# Redis 配置只做这一处：持久化，避免容器重启后池子清零重新攒 2~4 分钟
+name: proxyproof
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build: .
+    ports:
+      # 对外端口 = 根目录 .env 里的 API_PORT（默认 5555）。
+      # 公网长期挂着：改成冷门端口（如 18473），再配合 API_KEY + 云安全组只放行你自己的 IP
+      - "${API_PORT:-5555}:5555"
+    env_file:
+      - .env            # PROBE_TARGETS、API_KEY 等全量生效
+    environment:
+      # environment 优先于 env_file，下面这些是容器里的固定值：
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      # 容器内固定监听 5555，对外端口由 ports 决定；.env 里的 API_PORT 只影响对外端口
+      API_PORT: "5555"
+      API_HOST: 0.0.0.0
+      APP_ENV: prod
+      ENABLE_LOG_FILE: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:

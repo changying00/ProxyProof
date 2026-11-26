@@ -1,4 +1,6 @@
 import multiprocessing
+import os
+import signal
 import time
 
 from loguru import logger
@@ -38,6 +40,11 @@ class Scheduler:
         """
         run tester
         """
+        if not IS_WINDOWS:
+            # fork 的子进程继承了父进程注册的 SIGTERM handler（指向父进程的对象空间，
+            # 在这里跑会抛 AttributeError）。子进程要的是默认动作：收到信号直接退出。
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
         if not ENABLE_TESTER:
             logger.info('tester not enabled, exit')
             return
@@ -56,6 +63,10 @@ class Scheduler:
         """
         run getter
         """
+        if not IS_WINDOWS:
+            # 同 run_tester：子进程要默认信号动作，不继承父进程的 handler
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
         if not ENABLE_GETTER:
             logger.info('getter not enabled, exit')
             return
@@ -71,6 +82,10 @@ class Scheduler:
         """
         run server for api
         """
+        if not IS_WINDOWS:
+            # 同 run_tester：子进程要默认信号动作，不继承父进程的 handler
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
         if not ENABLE_SERVER:
             logger.info('server not enabled, exit')
             return
@@ -110,6 +125,23 @@ class Scheduler:
 
     def run(self):
         global tester_process, getter_process, server_process
+
+        if not IS_WINDOWS:
+            # 容器/服务器的正确退出路径：docker stop 发 SIGTERM，
+            # 默认行为是立即死亡、子进程变孤儿继续抓取。这里转发给子进程再收尾。
+            def _shutdown(signum, frame):
+                logger.info(f'received {signal.Signals(signum).name}, stopping children...')
+                for p in (tester_process, getter_process, server_process):
+                    if p and p.pid and p.is_alive():
+                        # 用 os.kill 直接发信号而不是 p.terminate()：
+                        # fork 的子进程会继承这个 handler，p.terminate() 触发子进程里
+                        # 自己的 handler，而子进程里那些 Process 对象从未 start()，
+                        # _popen 是 None，抛 AttributeError。os.kill 不存在这个问题，
+                        # 且子进程入口处已把 SIGTERM 重置为默认动作。
+                        os.kill(p.pid, signum)
+            signal.signal(signal.SIGTERM, _shutdown)
+            signal.signal(signal.SIGINT, _shutdown)
+
         try:
             logger.info('starting proxyproof...')
             if ENABLE_TESTER:
