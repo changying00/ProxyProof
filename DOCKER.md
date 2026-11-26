@@ -23,7 +23,14 @@ API_KEY=随机字符串
 
 ## 二、启动
 
+两种方式二选一：
+
 ```bash
+# A. 直接用预构建镜像（推荐，快，不用在服务器上编译）
+docker compose pull
+docker compose up -d
+
+# B. 从源码构建
 docker compose up -d --build
 ```
 

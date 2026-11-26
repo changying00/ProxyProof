@@ -15,7 +15,10 @@ services:
     restart: unless-stopped
 
   app:
+    image: ghcr.io/changying00/proxyproof:latest
     build: .
+    # image + build 并存：docker compose pull 用预构建镜像（快），
+    # docker compose up -d --build 从源码构建（改动代码后）
     ports:
       # 对外端口 = 根目录 .env 里的 API_PORT（默认 5555）。
       # 公网长期挂着：改成冷门端口（如 18473），再配合 API_KEY + 云安全组只放行你自己的 IP

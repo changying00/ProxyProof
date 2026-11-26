@@ -1,0 +1,39 @@
+name: publish-image
+
+# 每次打 tag（v*）自动构建并推送到 GHCR；
+# 也可以在 Actions 页面手动跑，指定任意已存在的 tag 补发镜像。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（如 v1.0.1，必须已推送到仓库）'
+        required: true
+        default: 'v1.0.1'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # 用 GITHUB_TOKEN 登录 GHCR，不需要本地登录也不需要 PAT
+      - name: Login to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build image
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          docker build -t ghcr.io/changying00/proxyproof:"$TAG" -t ghcr.io/changying00/proxyproof:latest .
+
+      - name: Push to GHCR
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          docker push ghcr.io/changying00/proxyproof:"$TAG"
+          docker push ghcr.io/changying00/proxyproof:latest
