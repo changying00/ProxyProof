@@ -67,7 +67,8 @@ GET_TIMEOUT = env.int('GET_TIMEOUT', 10)
 # 身份探针：一次请求同时得到 存活 / 出口 IP / 延迟
 PROBE_IDENTITY_URL = env.str('PROBE_IDENTITY_URL', 'http://ip.3322.net/')
 # 身份探测的回退链：国内不同出口对个别站点的可达性差异很大，单一端点会制造 UNKNOWN
-PROBE_IDENTITY_URLS = env.list('PROBE_IDENTITY_URLS',
+# 注意用 JSON（env.list 会按逗号切分，写 JSON 数组会解析成一堆带引号的碎片）
+PROBE_IDENTITY_URLS = env.json('PROBE_IDENTITY_URLS',
                                ['http://ip.3322.net/', 'http://myip.ipip.net/'])
 # 本机出口 IP 会轮换（实测同一分钟出现过 182.118.238.2/.14/.39 和 IPv6），
 # 所以基线是一组样本 + TTL，不是单个 IP

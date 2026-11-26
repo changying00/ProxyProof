@@ -76,6 +76,19 @@ source .venv/bin/activate      # Windows 用 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### 配置
+
+```bash
+cp .env.example .env
+```
+
+`.env.example` 列了全部可配置项并逐行写了注释，只有两项必须改：
+
+- `PROBE_TARGETS` —— 探测目标（默认是 Cloudflare 的连通性端点）
+- `REDIS_HOST` / `REDIS_PASSWORD` —— 如果 Redis 不在这台机器上
+
+`.env` 已在 `.gitignore` 里，写密码不会被提交。
+
 ### 运行代理池
 
 配置好环境变量（可以写进项目根目录的 `.env`，见下方「可配置项」）之后，一条命令启动全部：

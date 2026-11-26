@@ -6,7 +6,7 @@
 |---|---|---|
 | Python | `.venv/Scripts/python.exe` | 依赖已装（redis/aiohttp/flask/loguru…） |
 | Redis | 127.0.0.1:6379 | 已在本机运行，池数据在 **db0** |
-| 配置 | `.env` | 已生成，改目标站/阈值改这里 |
+| 配置 | `.env` | 从 `.env.example` 复制：`cp .env.example .env`，改目标站/阈值改这里 |
 
 ## 1. 一条命令启动
 
