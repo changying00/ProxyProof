@@ -1,385 +1,339 @@
-# ProxyPool
+# ProxyProof
 
-![build](https://github.com/Python3WebSpider/ProxyPool/workflows/build/badge.svg)
-![deploy](https://github.com/Python3WebSpider/ProxyPool/workflows/deploy/badge.svg)
-![](https://img.shields.io/badge/python-3.6%2B-brightgreen)
-![Docker Pulls](https://img.shields.io/docker/pulls/germey/proxypool)
+![](https://img.shields.io/badge/python-3.9%2B-brightgreen)
 
 简易高效的代理池，提供如下功能：
 
-- 定时抓取免费代理网站，简易可扩展。
-- 使用 Redis 对代理进行存储并对代理可用性进行排序。
-- 定时测试和筛选，剔除不可用代理，留下可用代理。
-- 提供代理 API，随机取用测试通过的可用代理。
+- 定时抓取免费代理网站，26 个源并发抓取，简易可扩展。
+- 使用 Redis 存储代理，并按**目标**分别记录可用性。
+- 定时探测，四态判定（可用 / 目标不通 / 死亡 / 未知），剔除不可用代理。
+- 提供代理 API，只返回"刚刚确认过能用"的代理。
 
-代理池原理解析可见「[如何搭建一个高效的代理池](https://cuiqingcai.com/7048.html)」，建议使用之前阅读。
+## 与常见代理池的区别
+
+大部分免费代理池的判定是"能不能连上百度"。这在实际使用中几乎没有预测力：同一个代理可能连得上百度、却打不开你的目标站。
+
+本项目的判定对象是 `(代理 × 目标 × 时刻)` 这个三元组：
+
+- 每个 `key` 对应一组目标 URL，代理对每个 key 单独记分，互不影响。
+- 只有"最近 `PROBE_MAX_AGE` 秒内确认可用"的代理会被发出去，否则直接返回 `503`。
+- 判定分四态：`OK` / `BLOCKED`（代理活着但目标不通）/ `DEAD`（连不上）/ `UNKNOWN`（探针自己出问题）。`BLOCKED` 降权不删除，`UNKNOWN` 完全不扣分——避免第三方抖动把好代理误杀。
+
+## 探测目标怎么选
+
+**这是整套系统里最需要想清楚的一件事**：探测器会对目标发请求，池子越大，请求越多。
+
+默认用的是 `http://cp.cloudflare.com/`——Cloudflare 专门为"连通性检测"提供的端点，返回 204、0 字节，面向海量探测设计。拿它当探针，等于不占用任何人的带宽，也不会把谁打限速。
+
+**不要拿别人的内容站当探针。** 我实测过：拿某资讯站（首页 271KB）当目标，跑几万个代理之后，对方直接把我本机 IP 限速到 11 秒响应。这不是"测试"，这是小型 CC。
+
+所以推荐的分工是：
+
+| key | 目标 | 用途 |
+|---|---|---|
+| `default` | `http://cp.cloudflare.com/` | 通用池：只验证"代理能正常代理 HTTP" |
+| 你的站 | 你自己的目标页 | 专用池：额外验证"代理能打开这个站" |
+
+```ini
+PROBE_TARGETS={"default":[{"url":"http://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://你的站/","min_len":3000}]}
+```
+
+然后 `GET /random?key=mysite`。两个池子的分数完全独立：一个代理在 `default` 里可能 95 分，在你的站上 0 分。
+
+如果你有服务器，最稳的做法是自己起一个端点（返回 204 或一句固定文本），把它写进 `PROBE_TARGETS`——完全不依赖第三方。
 
 ## 使用前注意
 
-本代理池是基于市面上各种公开代理源搭建的，所以可用性并不高，很可能上百上千个代理中才能找到一两个可用代理，不适合直接用于爬虫爬取任务。
+免费代理的可用性很低。实测 3000~10000 个代理里，能正常做 HTTP 代理的通常只有几十个（0.5%~5%，取决于目标站的容忍度）。
 
-如果您的目的是为了尽快使用代理完成爬取任务，建议您对接一些付费代理或者直接使用已有代理资源；如果您的目的是为了学习如何搭建一个代理池，您可以参考本项目继续完成后续步骤。
-
-付费代理推荐：
-
-- [ADSL 拨号代理](https://platform.acedata.cloud/documents/a82a528a-8e32-4c4c-a9d0-a21be7c9ef8c)：海量拨号（中国境内）高质量代理
-- [海外/全球代理](https://platform.acedata.cloud/documents/50f1437a-1857-43c5-85cf-5800ae1b31e4)：中国境外高质量代理
-- [蜂窝 4G/5G 代理](https://platform.acedata.cloud/documents/1cc59b19-1550-4169-a59d-ad6faf7f7517)：极高质量（中国境内）防风控代理
+如果目的是尽快完成爬取任务，建议对接付费代理；如果目的是学习怎么搭代理池，继续往下看。
 
 ## 使用准备
 
-首先当然是克隆代码并进入 ProxyPool 文件夹：
-
+```bash
+git clone <your-repo-url>
+cd ProxyProof
 ```
-git clone https://github.com/Python3WebSpider/ProxyPool.git
-cd ProxyPool
-```
-
-然后选用下面 Docker 和常规方式任意一个执行即可。
 
 ## 使用要求
 
-可以通过两种方式来运行代理池，一种方式是使用 Docker（推荐），另一种方式是常规方式运行，要求如下：
+- Python >= 3.9
+- Redis 5.0 及以上（不依赖 6.2 的 `ZRANDMEMBER`）
 
-### Docker
-
-如果使用 Docker，则需要安装如下环境：
-
-- Docker
-- Docker-Compose
-
-安装方法自行搜索即可。
-
-官方 Docker Hub 镜像：[germey/proxypool](https://hub.docker.com/r/germey/proxypool)
-
-### 常规方式
-
-常规方式要求有 Python 环境、Redis 环境，具体要求如下：
-
-- Python>=3.6
-- Redis
-
-## Docker 运行
-
-如果安装好了 Docker 和 Docker-Compose，只需要一条命令即可运行。
-
-```shell script
-docker-compose up
-```
-
-运行结果类似如下：
-
-```
-redis        | 1:M 19 Feb 2020 17:09:43.940 * DB loaded from disk: 0.000 seconds
-redis        | 1:M 19 Feb 2020 17:09:43.940 * Ready to accept connections
-proxypool    | 2020-02-19 17:09:44,200 CRIT Supervisor is running as root.  Privileges were not dropped because no user is specified in the config file.  If you intend to run as root, you can set user=root in the config file to avoid this message.
-proxypool    | 2020-02-19 17:09:44,203 INFO supervisord started with pid 1
-proxypool    | 2020-02-19 17:09:45,209 INFO spawned: 'getter' with pid 10
-proxypool    | 2020-02-19 17:09:45,212 INFO spawned: 'server' with pid 11
-proxypool    | 2020-02-19 17:09:45,216 INFO spawned: 'tester' with pid 12
-proxypool    | 2020-02-19 17:09:46,596 INFO success: getter entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
-proxypool    | 2020-02-19 17:09:46,596 INFO success: server entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
-proxypool    | 2020-02-19 17:09:46,596 INFO success: tester entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
-```
-
-可以看到 Redis、Getter、Server、Tester 都已经启动成功。
-
-这时候访问 [http://localhost:5555/random](http://localhost:5555/random) 即可获取一个随机可用代理。
-
-如果下载速度特别慢，可以自行修改 Dockerfile，修改：
-
-```diff
-- RUN pip install -r requirements.txt
-+ RUN pip install -r requirements.txt -i https://pypi.douban.com/simple
-```
-
-## 常规方式运行
-
-如果不使用 Docker 运行，配置好 Python、Redis 环境之后也可运行，步骤如下。
+## 安装和运行
 
 ### 安装和配置 Redis
 
-本地安装 Redis、Docker 启动 Redis、远程 Redis 都是可以的，只要能正常连接使用即可。
-
-首先可以需要一下环境变量，代理池会通过环境变量读取这些值。
-
-设置 Redis 的环境变量有两种方式，一种是分别设置 host、port、password，另一种是设置连接字符串，设置方法分别如下：
-
-设置 host、port、password，如果 password 为空可以设置为空字符串，示例如下：
-
-```shell script
-export PROXYPOOL_REDIS_HOST='localhost'
-export PROXYPOOL_REDIS_PORT=6379
-export PROXYPOOL_REDIS_PASSWORD=''
-export PROXYPOOL_REDIS_DB=0
-```
-
-或者只设置连接字符串：
-
-```shell script
-export PROXYPOOL_REDIS_CONNECTION_STRING='redis://localhost'
-```
-
-这里连接字符串的格式需要符合 `redis://[:password@]host[:port][/database]` 的格式，
-中括号参数可以省略，port 默认是 6379，database 默认是 0，密码默认为空。
-
-以上两种设置任选其一即可。
+本地安装 Redis、远程 Redis 都可以，只要能正常连接即可。
 
 ### 安装依赖包
 
-这里强烈推荐使用 [Conda](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-with-commands)
-或 [virtualenv](https://virtualenv.pypa.io/en/latest/user_guide.html) 创建虚拟环境，Python 版本不低于 3.6。
-
-然后 pip 安装依赖即可：
-
-```shell script
-pip3 install -r requirements.txt
+```bash
+python3 -m venv .venv
+source .venv/bin/activate      # Windows 用 .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 ### 运行代理池
 
-两种方式运行代理池，一种是 Tester、Getter、Server 全部运行，另一种是按需分别运行。
+配置好环境变量（可以写进项目根目录的 `.env`，见下方「可配置项」）之后，一条命令启动全部：
 
-一般来说可以选择全部运行，命令如下：
-
-```shell script
+```bash
 python3 run.py
 ```
 
-运行之后会启动 Tester、Getter、Server，这时访问 [http://localhost:5555/random](http://localhost:5555/random) 即可获取一个随机可用代理。
+也可以按需分别运行：
 
-或者如果你弄清楚了代理池的架构，可以按需分别运行，命令如下：
-
-```shell script
+```bash
 python3 run.py --processor getter
 python3 run.py --processor tester
 python3 run.py --processor server
 ```
 
-这里 processor 可以指定运行 Tester、Getter 还是 Server。
+运行后日志类似：
+
+```
+2026-11-26 20:19:43 | INFO | proxyproof.scheduler:run:100 - starting proxyproof...
+2026-11-26 20:19:43 | INFO | proxyproof.scheduler:run:104 - starting tester...
+2026-11-26 20:19:43 | INFO | proxyproof.scheduler:run:110 - starting getter...
+2026-11-26 20:19:43 | INFO | proxyproof.scheduler:run:116 - starting server...
+2026-11-26 20:19:50 | INFO | proxyproof.processors.tester:_pass:40 - [default] probed 200 fresh=12 total=3000
+```
+
+刚启动时池子是空的：getter 要先爬一轮（约 1 分钟），tester 再逐个探测，`fresh` 才会从 0 涨上来（2~4 分钟）。
+
+### 停止
+
+```bash
+python3 tools/stop.py
+```
+
+不要用 Ctrl+C 或任务管理器。调度器 spawn 出的子进程命令行里没有项目路径，手动 kill 容易留下孤儿进程继续抓取，还占着端口。
 
 ## 使用
 
-成功运行之后可以通过 [http://localhost:5555/random](http://localhost:5555/random) 获取一个随机可用代理。
+```bash
+curl http://127.0.0.1:5555/random
+```
 
-可以用程序对接实现，下面的示例展示了获取代理并爬取网页的过程：
+程序对接示例：
 
 ```python
 import requests
 
-proxypool_url = 'http://127.0.0.1:5555/random'
-target_url = 'http://httpbin.org/get'
+proxyproof_url = 'http://127.0.0.1:5555/random'
+target_url = 'http://你的目标/'
 
 def get_random_proxy():
-    """
-    get random proxy from proxypool
-    :return: proxy
-    """
-    return requests.get(proxypool_url).text.strip()
+    r = requests.get(proxyproof_url, timeout=5)
+    if r.status_code == 503:        # 池子暂时没有可用代理
+        return None
+    return r.text.strip()
 
 def crawl(url, proxy):
-    """
-    use proxy to crawl page
-    :param url: page url
-    :param proxy: proxy, such as 8.8.8.8:8888
-    :return: html
-    """
-    proxies = {'http': 'http://' + proxy}
-    return requests.get(url, proxies=proxies).text
+    proxies = {'http': 'http://' + proxy, 'https': 'http://' + proxy}
+    return requests.get(url, proxies=proxies, timeout=10).text
 
 
 def main():
-    """
-    main method, entry point
-    :return: none
-    """
     proxy = get_random_proxy()
+    if not proxy:
+        return
     print('get random proxy', proxy)
-    html = crawl(target_url, proxy)
-    print(html)
+    print(crawl(target_url, proxy)[:200])
 
 if __name__ == '__main__':
     main()
 ```
 
-运行结果如下：
-
-```
-get random proxy 116.196.115.209:8080
-{
-  "args": {},
-  "headers": {
-    "Accept": "*/*",
-    "Accept-Encoding": "gzip, deflate",
-    "Host": "httpbin.org",
-    "User-Agent": "python-requests/2.22.0",
-    "X-Amzn-Trace-Id": "Root=1-5e4d7140-662d9053c0a2e513c7278364"
-  },
-  "origin": "116.196.115.209",
-  "url": "https://httpbin.org/get"
-}
-```
-
-可以看到成功获取了代理，并请求 httpbin.org 验证了代理的可用性。
+完整示例见 [examples/usage.py](./examples/usage.py)。
 
 ### 获取多个代理
-
-如果一次需要多个代理，可以给 `/random` 接口传入 `count` 参数，一次返回多个随机代理（每行一个）：
 
 ```
 GET http://localhost:5555/random?count=5
 ```
 
-`count` 不传或为 1 时行为不变，仍返回单个代理；`count` 大于可用数量时返回全部可用代理。也可与 `key` 参数组合使用。
+`count` 不传或为 1 时返回单个；大于可用数量时返回全部。可与 `key` 组合。
 
-### 按地区（国家）筛选代理
-
-可以给 `/random` 和 `/all` 接口传入 `area` 参数，按代理 IP 所属国家筛选（ISO 国家码，大小写不敏感），例如只获取国内（中国）代理：
+### 按目标分组取代理
 
 ```
-GET http://localhost:5555/random?area=CN
-GET http://localhost:5555/all?area=CN
+GET http://localhost:5555/random?key=mysite
+GET http://localhost:5555/count?key=mysite
 ```
 
-国家信息由内置的 GeoLite2 离线库解析，无法解析归属地的代理会被排除。`area` 可与 `count`、`key` 参数组合使用。
+### 上报使用结果
+
+调用方的一次真实失败，比探测器十次探测更有信息量：
+
+```
+GET http://localhost:5555/report?proxy=1.2.3.4:80&ok=0
+```
+
+失败会立即把该代理摘出新鲜集合，不用等下一轮检测；成功则刷新其新鲜度。
+
+### 池子状态
+
+```
+GET http://localhost:5555/stats
+```
+
+返回每个 key 的 `total`（池内总数）、`fresh`（新鲜可用）、`due`（待检测）、`verdicts`（最近判定分布）。
 
 ## 可配置项
 
-代理池可以通过设置环境变量来配置一些参数。
+所有配置通过环境变量设置，可以写进项目根目录的 `.env`（`environs` 会自动读取）。
 
 ### 开关
 
-- ENABLE_TESTER：允许 Tester 启动，默认 true
-- ENABLE_GETTER：允许 Getter 启动，默认 true
-- ENABLE_SERVER：运行 Server 启动，默认 true
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `ENABLE_GETTER` | `true` | 是否启用获取器 |
+| `ENABLE_TESTER` | `true` | 是否启用检测器 |
+| `ENABLE_SERVER` | `true` | 是否启用 API 服务 |
 
 ### 环境
 
-- APP_ENV：运行环境，可以设置 dev、test、prod，即开发、测试、生产环境，默认 dev
-- APP_DEBUG：调试模式，可以设置 true 或 false，默认 true
-- APP_PROD_METHOD: 正式环境启动应用方式，默认是`gevent`，
-  可选：`tornado`，`meinheld`（分别需要安装 tornado 或 meinheld 模块）
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `APP_ENV` | `dev` | 可选 `dev` / `test` / `prod` |
+| `APP_DEBUG` | `dev` 下为 `true` | Flask 调试模式 |
 
 ### Redis 连接
 
-- PROXYPOOL_REDIS_HOST / REDIS_HOST：Redis 的 Host，其中 PROXYPOOL_REDIS_HOST 会覆盖 REDIS_HOST 的值。
-- PROXYPOOL_REDIS_PORT / REDIS_PORT：Redis 的端口，其中 PROXYPOOL_REDIS_PORT 会覆盖 REDIS_PORT 的值。
-- PROXYPOOL_REDIS_PASSWORD / REDIS_PASSWORD：Redis 的密码，其中 PROXYPOOL_REDIS_PASSWORD 会覆盖 REDIS_PASSWORD 的值。
-- PROXYPOOL_REDIS_DB / REDIS_DB：Redis 的数据库索引，如 0、1，其中 PROXYPOOL_REDIS_DB 会覆盖 REDIS_DB 的值。
-- PROXYPOOL_REDIS_CONNECTION_STRING / REDIS_CONNECTION_STRING：Redis 连接字符串，其中 PROXYPOOL_REDIS_CONNECTION_STRING 会覆盖 REDIS_CONNECTION_STRING 的值。
-- PROXYPOOL_REDIS_KEY / REDIS_KEY：Redis 储存代理使用字典的名称，其中 PROXYPOOL_REDIS_KEY 会覆盖 REDIS_KEY 的值。
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `REDIS_HOST` | `127.0.0.1` | Redis 地址 |
+| `REDIS_PORT` | `6379` | Redis 端口 |
+| `REDIS_PASSWORD` | 空 | Redis 密码 |
+| `REDIS_DB` | `0` | Redis 库号 |
+| `REDIS_CONNECTION_STRING` | 空 | 连接串，设置后优先于上面四项 |
 
-### 处理器
+### 目标与探测
 
-- CYCLE_TESTER：Tester 运行周期，即间隔多久运行一次测试，默认 20 秒
-- CYCLE_GETTER：Getter 运行周期，即间隔多久运行一次代理获取，默认 100 秒
-- TEST_URL：测试 URL，默认百度
-- TEST_TIMEOUT：测试超时时间，默认 10 秒
-- TEST_BATCH：批量测试数量，默认 20 个代理
-- TEST_VALID_STATUS：测试有效的状态码
-- TEST_ANONYMOUS：是否只保留匿名代理，默认 true
-- TEST_ANONYMOUS_URL：匿名 / 出口 IP 检测地址，默认 `https://httpbin.org/ip`，需返回 httpbin 格式的 JSON（`{"origin": "1.2.3.4"}`）。可指向自建 httpbin 服务以避免公共服务限流
-- API_HOST：代理 Server 运行 Host，默认 0.0.0.0
-- API_PORT：代理 Server 运行端口，默认 5555
-- API_THREADED：代理 Server 是否使用多线程，默认 true
-- API_KEY：API 访问鉴权密钥，默认空（即不鉴权）。设置后，调用 `/random`、`/all`、`/count` 需在请求头携带 `API-KEY`，详见下方「安全性」说明
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `PROBE_TARGETS` | `{"default":[{"url":"http://cp.cloudflare.com/","min_len":0}]}` | 目标分组，JSON |
+| `PROBE_IDENTITY_URLS` | `["http://ip.3322.net/","http://myip.ipip.net/"]` | 身份探针回退链，返回出口 IP |
+| `PROBE_TCP_TIMEOUT` | `0.8` | TCP 探测超时（秒） |
+| `PROBE_TIMEOUT_IDENTITY` | `3` | 身份探测超时 |
+| `PROBE_TIMEOUT_TARGET` | `6` | 目标探测超时 |
+| `PROBE_CONCURRENCY` | `100` | 探测并发数 |
+| `PROBE_BATCH` | `200` | 单批探测数量 |
 
-> ⚠️ 安全提示：代理 Server 默认监听 `0.0.0.0` 且 `API_KEY` 默认为空，任何能访问该端口的人都可以调用 `/random`、`/all`、`/count`。如果将代理池**暴露到公网**，请务必设置 `API_KEY`，并配合防火墙/安全组限制来源。`key` 查询参数已做格式校验，仅允许字母、数字及 `_ : -`，最长 64 位。
+`min_len` 是响应体长度下限，用来排掉挑战页和空壳页。204 端点设为 0。
 
-### 日志
+### 池容量与调度
 
-- LOG_DIR：日志相对路径
-- LOG_RUNTIME_FILE：运行日志文件名称
-- LOG_ERROR_FILE：错误日志文件名称
-- LOG_ROTATION: 日志记录周转周期或大小，默认 500MB，见 [loguru - rotation](https://github.com/Delgan/loguru#easier-file-logging-with-rotation--retention--compression)
-- LOG_RETENTION: 日志保留日期，默认 7 天，见 [loguru - retention](https://github.com/Delgan/loguru#easier-file-logging-with-rotation--retention--compression)
-- ENABLE_LOG_FILE：是否输出 log 文件，默认 true，如果设置为 false，那么 ENABLE_LOG_RUNTIME_FILE 和 ENABLE_LOG_ERROR_FILE 都不会生效
-- ENABLE_LOG_RUNTIME_FILE：是否输出 runtime log 文件，默认 true
-- ENABLE_LOG_ERROR_FILE：是否输出 error log 文件，默认 true
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `PROXY_NUMBER_MAX` | `3000` | 池子上限 |
+| `PROXY_SCORE_INIT` | `10` | 新代理入池初始分 |
+| `INTRODUCE_WINDOW` | `600` | 新代理首次检测打散窗口（秒） |
+| `CYCLE_TESTER` | `20` | 检测器每轮的时间预算（秒） |
+| `CYCLE_GETTER` | `300` | 抓取周期（秒） |
+| `PROBE_MAX_AGE` | `180` | 分发新鲜度闸门（秒） |
+| `GET_TIMEOUT` | `10` | 爬虫请求超时 |
 
-以上内容均可使用环境变量配置，即在运行前设置对应环境变量值即可，如更改测试地址和 Redis 键名：
+> 上限不是越大越好。`fresh` 的天花板 ≈ 检测吞吐 × 可用率 × 新鲜窗口，和池子大小无关。
+> 池子开到 10000 时 `fresh` 只有 50 左右，3000 时也有 40 左右——多出来的两万个代理只会摊薄检测频率。
 
-```shell script
-export TEST_URL=http://weibo.cn
-export REDIS_KEY=proxies:weibo
-```
+### API 与日志
 
-即可构建一个专属于微博的代理池，有效的代理都是可以爬取微博的。
-
-如果使用 Docker-Compose 启动代理池，则需要在 docker-compose.yml 文件里面指定环境变量，如：
-
-```yaml
-version: "3"
-services:
-  redis:
-    image: redis:alpine
-    container_name: redis
-    command: redis-server
-    ports:
-      - "6379:6379"
-    restart: always
-  proxypool:
-    build: .
-    image: "germey/proxypool"
-    container_name: proxypool
-    ports:
-      - "5555:5555"
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      TEST_URL: http://weibo.cn
-      REDIS_KEY: proxies:weibo
-```
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `API_HOST` | `0.0.0.0` | 只给本机用可改 `127.0.0.1` |
+| `API_PORT` | `5555` | API 端口 |
+| `API_THREADED` | `true` | Flask 多线程 |
+| `API_KEY` | 空 | 设置后请求需带 `API-KEY` 头 |
+| `ENABLE_LOG_FILE` | `true` | 是否写日志文件 |
+| `LOG_ROTATION` | `500MB` | 日志轮转大小 |
+| `LOG_RETENTION` | `1 week` | 日志保留时长 |
 
 ## 扩展代理爬虫
 
-代理的爬虫均放置在 proxypool/crawlers 文件夹下，目前对接了有限几个代理的爬虫。
-
-若扩展一个爬虫，只需要在 crawlers 文件夹下新建一个 Python 文件声明一个 Class 即可。
-
-写法规范如下：
+在 `proxyproof/crawlers/public/` 下新建文件，继承 `BaseCrawler` 即可自动加载：
 
 ```python
 from pyquery import PyQuery as pq
-from proxypool.schemas.proxy import Proxy
-from proxypool.crawlers.base import BaseCrawler
 
-BASE_URL = 'http://www.664ip.cn/{page}.html'
+from proxyproof.crawlers.base import BaseCrawler
+from proxyproof.schemas.proxy import Proxy
+
+BASE_URL = 'http://example.com/{page}'
 MAX_PAGE = 5
 
-class Daili66Crawler(BaseCrawler):
+
+class ExampleCrawler(BaseCrawler):
     """
-    daili66 crawler, http://www.66ip.cn/1.html
+    example.com, http://example.com
     """
     urls = [BASE_URL.format(page=page) for page in range(1, MAX_PAGE + 1)]
 
     def parse(self, html):
-        """
-        parse html file to get proxies
-        :return:
-        """
         doc = pq(html)
-        trs = doc('.containerbox table tr:gt(0)').items()
-        for tr in trs:
-            host = tr.find('td:nth-child(1)').text()
-            port = int(tr.find('td:nth-child(2)').text())
-            yield Proxy(host=host, port=port)
+        for item in doc('table tr').items():
+            ip = item.find('.ip').text()
+            port = item.find('.port').text()
+            if ip and port:
+                yield Proxy(host=ip, port=int(port))
 ```
 
-在这里只需要定义一个 Crawler 继承 BaseCrawler 即可，然后定义好 urls 变量和 parse 方法即可。
+如果源是"每行一个 `ip:port`"的纯文本列表，继承 `proxyproof/crawlers/base_list.py` 的 `TextListCrawler`，只声明 `urls` 就行。
 
-- urls 变量即为爬取的代理网站网址列表，可以用程序定义也可写成固定内容。
-- parse 方法接收一个参数即 html，代理网址的 html，在 parse 方法里只需要写好 html 的解析，解析出 host 和 port，并构建 Proxy 对象 yield 返回即可。
+爬虫的 HTTP 请求强制不走系统代理（`trust_env=False`），这样本机开不开 Clash 都不影响抓取结果。
 
-网页的爬取不需要实现，BaseCrawler 已经有了默认实现，如需更改爬取方式，重写 crawl 方法即可。
+### 现有源的情况
 
-欢迎大家多多发 Pull Request 贡献 Crawler，使其代理源更丰富强大起来。
+26 个源里产量和可用率差得很远（实测）：
 
-## 部署
+| 类型 | 代表 | 说明 |
+|---|---|---|
+| 高产低质 | OpenProxyList、Proxy4Parsing、Geonode、Jetkai、B4RC0DE | 单轮 3000~10000 条，可用率 0.2%~1.4% |
+| 高质量 | AdvancedName | 只有 300 条，可用率 12% |
+| 少量 | ShiftyTR、KxDaili、Ihuan、Prxchk | 几十条 |
 
-本项目提供了 Kubernetes 部署脚本，如需部署到 Kubernetes，请参考 [kubernetes](./kubernetes)。
+原来那批国内站（daili66、kuaidaili、ip3366、xicidaili、zhandaye 等）已经不抓了：一部分真的关站/改版，一部分是页面结构变了导致 `parse` 取不到数据。这些站现在大多要登录或上了反爬，性价比很低。
 
-如有一起开发的兴趣可以在 Issue 留言，非常感谢！
+## 目录
+
+```
+proxyproof/
+  probe/        判定规则、探测端点、漏斗探测
+  storages/     池存储（ZSET + hash + 新鲜度索引）
+  processors/   getter / tester / server
+  crawlers/     26 个代理源，public/ 下每个文件一个源
+  schemas/      Proxy
+  setting.py    全部配置
+tools/
+  stop.py               停掉本项目所有进程
+  measure_crawlers.py   量每个爬虫能抓多少条（不写库）
+  eval_baseline.py      按 EVAL_STANDARD 算评测指标
+  samples/              抽样原始数据（本地评测用，已 gitignore）
+examples/usage.py       接入示例（含 /report 反馈）
+run.py                  入口，--processor 可单独跑
+```
+
+## 免责声明
+
+**本项目仅用于技术学习与研究。**
+
+1. **代理来源**：池中的代理全部抓取自互联网上的公开免费资源。本项目不生产、不购买、也不验证这些代理的合法性与归属。免费代理常被多人共用，可能被用于扫描、撞库等恶意行为，**其出口 IP 的信誉不由本项目控制**。
+
+2. **不要传输敏感数据**：经免费代理传输的任何内容，理论上都可能被代理持有者记录或篡改。**严禁**通过本项目的代理提交账号密码、支付信息、身份证件、企业内部数据等敏感内容。
+
+3. **控制请求频率**：本项目默认把探测目标设为 Cloudflare 的连通性端点（`cp.cloudflare.com`，返回 204、0 字节），就是为了不给任何第三方站点造成负担。**请勿把别人的内容站当作探针**——实测把某资讯站设为目标后，几万次探测会使对方对该 IP 限速。你自己在 `PROBE_TARGETS` 里配置的目标站，其访问频率与合规性由你负责。
+
+4. **遵守目标站点规则**：使用代理访问任何站点时，请遵守该站点的 `robots.txt`、服务条款与当地法律法规。本项目不提供绕过访问控制、验证码、付费墙或反爬机制的能力。
+
+5. **数据与隐私**：本项目不收集、不上传任何使用者数据。所有状态仅存于你本机的 Redis，日志仅写本地 `logs/` 目录。
+
+6. **无担保**：软件按「原样」提供，不附带任何明示或暗示的担保。因使用本项目产生的任何直接或间接损失（包括但不限于 IP 被封、账号受限、法律纠纷），由使用者自行承担。
+
+7. **合规使用**：请勿将本项目用于网络攻击、非法爬取、绕过地域限制获取受版权保护的内容，或任何违反所在地法律的活动。
+
+如果你不接受上述条款，请停止使用并删除本项目。
 
 ## LICENSE
 
