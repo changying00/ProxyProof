@@ -1,8 +1,9 @@
-from proxyproof.schemas.proxy import Proxy
-from proxyproof.crawlers.base import BaseCrawler
 import re
-from pyquery import PyQuery as pq
 import time
+
+from proxyproof.crawlers.base import BaseCrawler
+from proxyproof.schemas.proxy import Proxy
+
 BASE_URL = 'https://ip.ihuan.me/today/{path}.html'
 
 

@@ -4,7 +4,6 @@ from proxyproof.crawlers.base_list import SafeFetchCrawler
 from proxyproof.crawlers.parsers import normalize_proxy
 from proxyproof.schemas.proxy import Proxy
 
-
 # 1=国内高匿 2=国内普通 3=国内 HTTPS
 BASE_URL = 'https://www.kxdaili.com/dailiip/{type}/{page}.html'
 MAX_PAGE = 2

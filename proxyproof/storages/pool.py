@@ -16,8 +16,15 @@ import time
 import redis
 
 from proxyproof.probe import verdict as V
-from proxyproof.setting import (INTRODUCE_WINDOW, PROXY_SCORE_INIT, REDIS_CONNECTION_STRING, REDIS_DB,
-                               REDIS_HOST, REDIS_PASSWORD, REDIS_PORT)
+from proxyproof.setting import (
+    INTRODUCE_WINDOW,
+    PROXY_SCORE_INIT,
+    REDIS_CONNECTION_STRING,
+    REDIS_DB,
+    REDIS_HOST,
+    REDIS_PASSWORD,
+    REDIS_PORT,
+)
 
 POP_LUA = """
 local items = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, tonumber(ARGV[2]))
@@ -95,7 +102,6 @@ class Pool:
 
     def add_many(self, proxies, key, src=None):
         n = 0
-        pipe = self.db.pipeline()
         for p in proxies:
             if self.add(p, key, src):
                 n += 1

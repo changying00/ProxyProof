@@ -17,9 +17,14 @@ import aiohttp
 
 from proxyproof.probe import verdict as V
 from proxyproof.probe.endpoint import Baseline, targets
-from proxyproof.setting import (PROBE_CONCURRENCY, PROBE_IDENTITY_URL,
-                               PROBE_IDENTITY_URLS, PROBE_TCP_TIMEOUT,
-                               PROBE_TIMEOUT_IDENTITY, PROBE_TIMEOUT_TARGET)
+from proxyproof.setting import (
+    PROBE_CONCURRENCY,
+    PROBE_IDENTITY_URL,
+    PROBE_IDENTITY_URLS,
+    PROBE_TCP_TIMEOUT,
+    PROBE_TIMEOUT_IDENTITY,
+    PROBE_TIMEOUT_TARGET,
+)
 
 IPV4 = re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b')
 IPV6 = re.compile(r'\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}\b')

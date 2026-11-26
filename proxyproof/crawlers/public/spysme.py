@@ -1,6 +1,5 @@
 from proxyproof.crawlers.base_list import TextListCrawler
 
-
 BASE_URL = 'https://spys.me/{protocol}.txt'
 
 

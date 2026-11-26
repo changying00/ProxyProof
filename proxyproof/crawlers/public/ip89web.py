@@ -4,7 +4,6 @@ from proxyproof.crawlers.base_list import SafeFetchCrawler
 from proxyproof.crawlers.parsers import normalize_proxy
 from proxyproof.schemas.proxy import Proxy
 
-
 BASE_URL = 'https://www.89ip.cn/index_{page}.html'
 MAX_PAGE = 5
 

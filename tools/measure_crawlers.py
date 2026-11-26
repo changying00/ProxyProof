@@ -44,7 +44,6 @@ def main():
             print(f"[{i:2d}/{len(futs)}] {r['name']:26s} {r['n']:5d} 条 "
                   f"{r['secs']:5.1f}s {r['err'] or ''}", flush=True)
 
-    allp = []
     rows.sort(key=lambda r: -r["n"])
     print("\n=== 按产量排序 ===")
     for r in rows:

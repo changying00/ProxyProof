@@ -1,6 +1,5 @@
 from proxyproof.crawlers.base_list import TextListCrawler
 
-
 # 带 scheme 前缀（http://1.2.3.4:8080），解析器已支持
 BASE_URL = 'https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt'
 

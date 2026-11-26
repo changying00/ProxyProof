@@ -1,9 +1,11 @@
-import time
-from retrying import RetryError
-from loguru import logger
-from proxyproof.schemas.proxy import Proxy
-from proxyproof.crawlers.base import BaseCrawler
 import json
+import time
+
+from loguru import logger
+from retrying import RetryError
+
+from proxyproof.crawlers.base import BaseCrawler
+from proxyproof.schemas.proxy import Proxy
 
 BASE_URL = 'https://proxylist.geonode.com/api/proxy-list?limit=500&page={page}&sort_by=lastChecked&sort_type=desc'
 MAX_PAGE = 18
@@ -41,7 +43,8 @@ class GeonodeCrawler(BaseCrawler):
             'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="99", "Google Chrome";v="99"',
             'accept': 'application/json, text/plain, */*',
             'sec-ch-ua-mobile': '?0',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.83 Safari/537.36',
+            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+                          '(KHTML, like Gecko) Chrome/99.0.4844.83 Safari/537.36',
             'sec-ch-ua-platform': '"macOS"',
             'origin': 'https://geonode.com',
             'sec-fetch-site': 'same-site',

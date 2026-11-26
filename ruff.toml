@@ -1,0 +1,17 @@
+# ruff 配置：python -m ruff check .   （CI 会跑同一条命令）
+target-version = "py39"
+line-length = 120
+exclude = [".venv", "logs", "tools/samples"]
+
+[lint]
+select = [
+    "E",   # pycodestyle 错误
+    "W",   # pycodestyle 警告
+    "F",   # pyflakes（未使用的导入/变量、重复定义等）
+    "I",   # isort（导入顺序）
+    "B",   # flake8-bugbear（常见 bug 模式）
+    "UP",  # pyupgrade（按 target-version 能安全升级的语法）
+]
+
+[lint.isort]
+known-first-party = ["proxyproof"]

@@ -6,7 +6,6 @@
 """
 import re
 
-
 # 严格行格式：1.2.3.4:8080
 # 允许 scheme 前缀、认证信息、以及任意分隔的尾部字段
 # （如 hideip.me 的 `ip:port:国家`、spys.me 的 `ip:port US-H-S -`）

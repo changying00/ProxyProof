@@ -1,6 +1,6 @@
-from proxyproof.scheduler import Scheduler
 import argparse
 
+from proxyproof.scheduler import Scheduler
 
 parser = argparse.ArgumentParser(description='ProxyProof')
 parser.add_argument('--processor', type=str, help='processor to run')

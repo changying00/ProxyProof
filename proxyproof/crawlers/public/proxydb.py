@@ -6,7 +6,6 @@ from proxyproof.crawlers.base_list import SafeFetchCrawler
 from proxyproof.crawlers.parsers import normalize_proxy
 from proxyproof.schemas.proxy import Proxy
 
-
 BASE_URL = 'https://proxydb.net/?protocol={protocol}&offset={offset}'
 MAX_PAGE = 4
 PAGE_SIZE = 15

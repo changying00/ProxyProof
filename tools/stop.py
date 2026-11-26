@@ -14,7 +14,8 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 5555
 
 PS = (
     "Get-CimInstance Win32_Process | "
-    "ForEach-Object { $_.ProcessId.ToString() + '|' + $_.ParentProcessId.ToString() + '|' + $_.Name + '|' + $_.CommandLine }"
+    "ForEach-Object { $_.ProcessId.ToString() + '|' + $_.ParentProcessId.ToString() "
+    "+ '|' + $_.Name + '|' + $_.CommandLine }"
 )
 NET = ("Get-NetTCPConnection -LocalPort " + str(PORT) +
        " -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $_.OwningProcess }")

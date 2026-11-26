@@ -7,8 +7,7 @@ from loguru import logger
 
 from proxyproof.exceptions import PoolEmptyException
 from proxyproof.probe.endpoint import all_keys
-from proxyproof.setting import (API_HOST, API_KEY, API_PORT, API_THREADED, IS_DEV,
-                               PROBE_MAX_AGE)
+from proxyproof.setting import API_HOST, API_KEY, API_PORT, API_THREADED, IS_DEV, PROBE_MAX_AGE
 from proxyproof.storages.pool import Pool
 
 __all__ = ['app']

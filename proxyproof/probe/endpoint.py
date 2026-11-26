@@ -4,14 +4,9 @@
 基线 IP 必须是一**组**而不是一个 —— 实测本机出口在 182.118.238.2/.14/.39 之间
 轮换，还会切到 IPv6，拿单个 IP 比对会把正常代理判成透明。
 """
-import asyncio
 import time
 
-import aiohttp
-
-from proxyproof.setting import (PROBE_IDENTITY_URL, PROBE_BASELINE_TTL,
-                               PROBE_TARGETS, PROBE_TCP_TIMEOUT, PROBE_TIMEOUT_IDENTITY,
-                               PROBE_TIMEOUT_TARGET)
+from proxyproof.setting import PROBE_BASELINE_TTL, PROBE_IDENTITY_URL, PROBE_TARGETS, PROBE_TIMEOUT_IDENTITY
 
 
 class Baseline:

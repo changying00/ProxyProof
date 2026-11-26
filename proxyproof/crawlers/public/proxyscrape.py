@@ -1,6 +1,5 @@
 from proxyproof.crawlers.base_list import TextListCrawler
 
-
 # v2 的 displayproxies 接口一次性返回全部可用代理，纯文本 ip:port
 BASE_URL = ('https://api.proxyscrape.com/v2/?request=displayproxies'
             '&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all')

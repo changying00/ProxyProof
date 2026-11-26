@@ -1,10 +1,11 @@
-from retrying import RetryError, retry
-import requests
-from loguru import logger
-from proxyproof.setting import GET_TIMEOUT
-from fake_headers import Headers
 import time
 
+import requests
+from fake_headers import Headers
+from loguru import logger
+from retrying import RetryError, retry
+
+from proxyproof.setting import GET_TIMEOUT
 
 # 不要走系统代理（Windows 上 Clash 之类的 ProxyEnable 会让 requests 把
 # 127.0.0.1:7897 当成代理）。抓取结果必须与"本机开没开代理"无关。
@@ -12,7 +13,7 @@ _DEFAULT_SESSION = requests.Session()
 _DEFAULT_SESSION.trust_env = False
 
 
-class BaseCrawler(object):
+class BaseCrawler:
     urls = []
     session = _DEFAULT_SESSION
 

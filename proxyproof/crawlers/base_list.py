@@ -1,12 +1,11 @@
 import requests
 from loguru import logger
-from retrying import retry, RetryError
+from retrying import RetryError, retry
 
 from proxyproof.crawlers.base import BaseCrawler
 from proxyproof.crawlers.parsers import iter_line_proxies
 from proxyproof.schemas.proxy import Proxy
 from proxyproof.setting import GET_TIMEOUT
-
 
 # 不带 br：环境未安装 brotli 时，声明 br 会拿到被截断的响应体
 DEFAULT_HEADERS = {

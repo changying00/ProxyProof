@@ -4,7 +4,6 @@ from proxyproof.crawlers.base_list import SafeFetchCrawler
 from proxyproof.crawlers.parsers import normalize_proxy
 from proxyproof.schemas.proxy import Proxy
 
-
 BASE_URL = 'https://advanced.name/freeproxy?page={page}'
 MAX_PAGE = 3
 

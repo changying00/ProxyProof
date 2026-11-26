@@ -1,6 +1,5 @@
 from proxyproof.crawlers.base_list import TextListCrawler
 
-
 BASE_URL = 'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/{protocol}.txt'
 
 

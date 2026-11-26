@@ -7,7 +7,7 @@ from proxyproof.setting import PROXY_NUMBER_MAX
 from proxyproof.storages.pool import Pool
 
 
-class Getter(object):
+class Getter:
     def __init__(self):
         self.pool = Pool()
         self.crawlers_cls = crawlers_cls
