@@ -1,6 +1,8 @@
 # ProxyProof
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 ![](https://img.shields.io/badge/python-3.9%2B-brightgreen)
+![](https://img.shields.io/badge/redis-5.0%2B-red)
 
 简易高效的代理池，提供如下功能：
 
@@ -51,7 +53,7 @@ PROBE_TARGETS={"default":[{"url":"http://cp.cloudflare.com/","min_len":0}],"mysi
 ## 使用准备
 
 ```bash
-git clone <your-repo-url>
+git clone git@github.com:changying00/ProxyProof.git
 cd ProxyProof
 ```
 
@@ -314,6 +316,30 @@ tools/
 examples/usage.py       接入示例（含 /report 反馈）
 run.py                  入口，--processor 可单独跑
 ```
+
+## 来源与致谢
+
+本项目派生自 **[Python3WebSpider/ProxyPool](https://github.com/Python3WebSpider/ProxyPool)**（作者 [崔庆才 Germey](https://cuiqingcai.com/7048.html)，MIT 协议），最初的代理池设计与爬虫框架来自那里。如果你只是想理解"代理池是怎么工作的"，那篇原文比本 README 讲得更系统。
+
+**保留的部分**
+
+- `BaseCrawler` / `TextListCrawler` 爬虫框架与自动注册机制（26 个源都是这个模式）
+- 用 Redis 有序集合存储代理的基本思路
+- `/random`、`/count`、`/all` 的 API 形态
+
+**重写的部分**
+
+| 原实现 | 现在 | 为什么 |
+|---|---|---|
+| 二元判定（有效/无效），减分淘汰 | 四态（OK/BLOCKED/DEAD/UNKNOWN） | 原实现把"第三方探针超时"和"代理坏了"混为一谈，一次网络抖动能把整池减没 |
+| 全量 ZSCAN 扫描，周期 20s | 到期队列 + 热队列 | 原实现的"周期"实际是"扫完耗时 + 20s"，池子一大就失控；且在 ZSCAN 中改分数会漏成员 |
+| 一个全局分数 | 按目标（key）分别记分 | 代理的可用性是相对目标而言的，一个分数量化不了 |
+| 可用即置 100，失败减 1 | EWMA × 延迟 × 纯度 | 100 分这一档没有区分度，抖动代理和岩石代理同分 |
+| 分发时全量拉满分集合再随机 | SRANDMEMBER + power-of-two-choices | 5 万池下每次请求 54ms → 2.2ms |
+| 无可用代理时降级返回低分代理 | 直接 503 | 发一个死代理比返回"暂时没有"更伤调用方 |
+| 每轮直连取 httpbin 基线做匿名判定 | 进程内缓存一组基线 IP | 本机出口会在同一 /24 内轮换，单个 IP 比对会误判 |
+
+感谢原作者把这个项目做到"能跑、能读、能扩展"的程度——没有那套爬虫框架和清晰的模块划分，这次的改造不会这么顺。
 
 ## 免责声明
 
