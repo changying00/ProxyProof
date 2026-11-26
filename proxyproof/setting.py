@@ -1,9 +1,9 @@
 import platform
-from os.path import dirname, abspath, join
+import shutil
+from os.path import abspath, dirname, join
+
 from environs import Env
 from loguru import logger
-import shutil
-
 
 env = Env()
 env.read_env()
@@ -32,6 +32,10 @@ APP_PROD_METHOD_GEVENT = 'gevent'
 APP_PROD_METHOD_TORNADO = 'tornado'
 APP_PROD_METHOD_MEINHELD = 'meinheld'
 APP_PROD_METHOD = env.str('APP_PROD_METHOD', APP_PROD_METHOD_GEVENT).lower()
+APP_PROD_METHODS = (APP_PROD_METHOD_GEVENT, APP_PROD_METHOD_TORNADO, APP_PROD_METHOD_MEINHELD)
+if APP_PROD_METHOD not in APP_PROD_METHODS:
+    # 配错就在导入时炸，而不是等到 prod 的 server 子进程里才发现
+    raise ValueError(f"APP_PROD_METHOD={APP_PROD_METHOD!r} 不支持，可选：{', '.join(APP_PROD_METHODS)}")
 
 # redis host
 REDIS_HOST = env.str('PROXYPROOF_REDIS_HOST',

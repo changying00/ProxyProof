@@ -1,14 +1,17 @@
-environs>=9.3.0,<12.0.0
-Flask>=2.0.0,<3.0.0
-Werkzeug>=2.0.0,<3.0.0
-attrs>=20.3.0,<24.0.0
+# 上限写的是「已实测通过的最新大版本的下一个大版本」，不是随手拍的：
+# Python 3.12 上验证过 Flask 3.1 / Werkzeug 3.1 / attrs 26 / environs 15 / redis 8 /
+# lxml 6 / pyquery 2 / gevent 26 能跑通测试套件和 26 个爬虫；升到更新的版本请先跑 pytest。
+environs>=9.3.0,<16.0.0
+Flask>=2.0.0,<4.0.0
+Werkzeug>=2.0.0,<4.0.0
+attrs>=20.3.0,<27.0.0
 aiohttp>=3.9.0,<4.0.0
 requests>=2.25.1,<3.0.0
-redis>=4.3.0,<6.0.0
+redis>=4.3.0,<9.0.0
 loguru>=0.5.3,<1.0.0
 retrying>=1.3.3,<2.0.0
-pyquery>=1.4.3,<2.0.0
-lxml>=4.6.5,<6.0.0
+pyquery>=1.4.3,<3.0.0
+lxml>=4.6.5,<7.0.0
 fake_headers>=1.0.2,<2.0.0
-# 生产模式（APP_ENV=prod）的 WSGI 容器
-gevent>=22.10.2,<25.0.0
+# 生产模式（APP_ENV=prod）默认的 WSGI 容器；改用 tornado / meinheld 时自行 pip install
+gevent>=22.10.2,<27.0.0

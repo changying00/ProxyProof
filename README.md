@@ -1,100 +1,51 @@
 # ProxyProof
 
+[![CI](https://github.com/changying00/ProxyProof/actions/workflows/ci.yml/badge.svg)](https://github.com/changying00/ProxyProof/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 ![](https://img.shields.io/badge/python-3.9%2B-brightgreen)
 ![](https://img.shields.io/badge/redis-5.0%2B-red)
 
-简易高效的代理池，提供如下功能：
+[English](./README.en.md)
 
-- 定时抓取免费代理网站，26 个源并发抓取，简易可扩展。
-- 使用 Redis 存储代理，并按**目标**分别记录可用性。
-- 定时探测，四态判定（可用 / 目标不通 / 死亡 / 未知），剔除不可用代理。
-- 提供代理 API，只返回"刚刚确认过能用"的代理。
+Python 代理池：抓取免费代理，按目标站点验证可用性，通过 HTTP API 取用。
 
-## 与常见代理池的区别
+```console
+$ curl localhost:5555/random            # 取一个刚确认过能用的代理
+39.109.113.97:4090
 
-大部分免费代理池的判定是"能不能连上百度"。这在实际使用中几乎没有预测力：同一个代理可能连得上百度、却打不开你的目标站。
-
-本项目的判定对象是 `(代理 × 目标 × 时刻)` 这个三元组：
-
-- 每个 `key` 对应一组目标 URL，代理对每个 key 单独记分，互不影响。
-- 只有"最近 `PROBE_MAX_AGE` 秒内确认可用"的代理会被发出去，否则直接返回 `503`。
-- 判定分四态：`OK` / `BLOCKED`（代理活着但目标不通）/ `DEAD`（连不上）/ `UNKNOWN`（探针自己出问题）。`BLOCKED` 降权不删除，`UNKNOWN` 完全不扣分——避免第三方抖动把好代理误杀。
-
-## 探测目标怎么选
-
-**这是整套系统里最需要想清楚的一件事**：探测器会对目标发请求，池子越大，请求越多。
-
-默认用的是 `http://cp.cloudflare.com/`——Cloudflare 专门为"连通性检测"提供的端点，返回 204、0 字节，面向海量探测设计。拿它当探针，等于不占用任何人的带宽，也不会把谁打限速。
-
-**不要拿别人的内容站当探针。** 我实测过：拿某资讯站（首页 271KB）当目标，跑几万个代理之后，对方直接把我本机 IP 限速到 11 秒响应。这不是"测试"，这是小型 CC。
-
-所以推荐的分工是：
-
-| key | 目标 | 用途 |
-|---|---|---|
-| `default` | `http://cp.cloudflare.com/` | 通用池：只验证"代理能正常代理 HTTP" |
-| 你的站 | 你自己的目标页 | 专用池：额外验证"代理能打开这个站" |
-
-```ini
-PROBE_TARGETS={"default":[{"url":"http://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://你的站/","min_len":3000}]}
+$ curl localhost:5555/stats             # 池子现状
+{"default": {"total": 2899, "fresh": 149, "due": 841,
+             "verdicts": {"OK": 167, "BLOCKED": 73, "DEAD": 2094, "UNKNOWN": 172}}}
 ```
 
-然后 `GET /random?key=mysite`。两个池子的分数完全独立：一个代理在 `default` 里可能 95 分，在你的站上 0 分。
+`fresh` 是「最近 `PROBE_MAX_AGE` 秒内确认可用」的数量，`/random` 只从这里取。一个都没有时返回 `503`，不会拿没验证过的代理凑数。
 
-如果你有服务器，最稳的做法是自己起一个端点（返回 204 或一句固定文本），把它写进 `PROBE_TARGETS`——完全不依赖第三方。
+- 26 个免费代理源定时抓取，Redis 存储，HTTP API 取用（`/random` `/all` `/count` `/stats` `/report`）
+- 按目标站点分别记分，判定分四态，只发最近确认过能用的代理
+- 探测走漏斗（TCP → 身份 → 目标），死代理 0.8 秒出局；默认探针是 Cloudflare 的连通性端点，不给任何站点添负担
 
-## 使用前注意
+## 谁适合用
 
-免费代理的可用性很低。实测 3000~10000 个代理里，能正常做 HTTP 代理的通常只有几十个（0.5%~5%，取决于目标站的容忍度）。
+- **适合**：想弄明白代理池是怎么设计的、有小规模抓取任务、不想买付费代理。
+- **不适合**：生产级的大规模采集。免费代理的可用率只有百分之几（本机实测：3000 个代理里，能用的在几十到三百之间波动），这个量级直接买付费代理更省事。
 
-如果目的是尽快完成爬取任务，建议对接付费代理；如果目的是学习怎么搭代理池，继续往下看。
+## 快速开始
 
-## 使用准备
+需要 Python >= 3.9、Redis 5.0 及以上（不依赖 6.2 才有的 `ZRANDMEMBER`）。
 
 ```bash
-git clone git@github.com:changying00/ProxyProof.git
+git clone https://github.com/changying00/ProxyProof.git
 cd ProxyProof
-```
-
-## 使用要求
-
-- Python >= 3.9
-- Redis 5.0 及以上（不依赖 6.2 的 `ZRANDMEMBER`）
-
-## 安装和运行
-
-### 安装和配置 Redis
-
-本地安装 Redis、远程 Redis 都可以，只要能正常连接即可。
-
-### 安装依赖包
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate      # Windows 用 .venv\Scripts\activate
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-### 配置
-
-```bash
-cp .env.example .env
-```
-
-`.env.example` 列了全部可配置项并逐行写了注释，只有两项必须改：
-
-- `PROBE_TARGETS` —— 探测目标（默认是 Cloudflare 的连通性端点）
-- `REDIS_HOST` / `REDIS_PASSWORD` —— 如果 Redis 不在这台机器上
-
-`.env` 已在 `.gitignore` 里，写密码不会被提交。
-
-### 运行代理池
-
-配置好环境变量（可以写进项目根目录的 `.env`，见下方「可配置项」）之后，一条命令启动全部：
-
-```bash
+cp .env.example .env                                  # Redis 不在本机时改 REDIS_HOST / REDIS_PASSWORD
 python3 run.py
+```
+
+刚启动时池子是空的：getter 先爬一轮（约 1 分钟），tester 再逐个探测，`fresh` 要 2~4 分钟才涨上来。之后：
+
+```bash
+curl http://127.0.0.1:5555/random
 ```
 
 也可以按需分别运行：
@@ -115,15 +66,21 @@ python3 run.py --processor server
 2026-11-26 20:19:50 | INFO | proxyproof.processors.tester:_pass:40 - [default] probed 200 fresh=12 total=3000
 ```
 
-刚启动时池子是空的：getter 要先爬一轮（约 1 分钟），tester 再逐个探测，`fresh` 才会从 0 涨上来（2~4 分钟）。
+**停止**用 `python3 tools/stop.py`。不要用 Ctrl+C 或任务管理器——调度器 spawn 出的子进程命令行里没有项目路径，手动 kill 容易留下孤儿进程继续抓取，还占着端口。
 
-### 停止
+`.env` 列了全部可配置项并逐行写了注释，通常只有 `REDIS_HOST` / `REDIS_PASSWORD` 需要改。`.env` 已在 `.gitignore` 里，写密码不会被提交。
 
-```bash
-python3 tools/stop.py
-```
+## 和常见代理池的区别
 
-不要用 Ctrl+C 或任务管理器。调度器 spawn 出的子进程命令行里没有项目路径，手动 kill 容易留下孤儿进程继续抓取，还占着端口。
+大多数代理池的判定是「这个代理能不能连上百度」，对你真正要访问的站点几乎没有预测力——连得上百度，不代表能打开你的目标站。
+
+本项目按 `(代理 × 目标 × 时刻)` 记分：
+
+- 每个 `key` 对应一组目标 URL，代理对每个 key 单独记分，互不影响。用法见[按目标分组取代理](#按目标分组取代理)。
+- 判定分四态：`OK` / `BLOCKED`（代理活着但目标不通）/ `DEAD`（连不上）/ `UNKNOWN`（探针自己出问题）。`BLOCKED` 降权不删除，`UNKNOWN` 不扣分——第三方探针抖一下，不会把好代理误杀。
+- 只有「最近 `PROBE_MAX_AGE` 秒内确认可用」的代理才会被发出，否则返回 `503`。
+
+探测目标该怎么选、为什么默认是 `cp.cloudflare.com`，见[探测目标怎么选](#探测目标怎么选)。
 
 ## 使用
 
@@ -173,10 +130,14 @@ GET http://localhost:5555/random?count=5
 
 ### 按目标分组取代理
 
+先在 `PROBE_TARGETS` 里加一个 `key`（写法见[探测目标怎么选](#探测目标怎么选)），然后：
+
 ```
 GET http://localhost:5555/random?key=mysite
 GET http://localhost:5555/count?key=mysite
 ```
+
+两个池子的分数完全独立：一个代理在 `default` 里可能 95 分，在你的站上 0 分。
 
 ### 上报使用结果
 
@@ -198,7 +159,7 @@ GET http://localhost:5555/stats
 
 ## 可配置项
 
-所有配置通过环境变量设置，可以写进项目根目录的 `.env`（`environs` 会自动读取）。
+所有配置通过环境变量设置，可以写进项目根目录的 `.env`（`environs` 会自动读取）。完整清单见 [.env.example](./.env.example)。
 
 ### 开关
 
@@ -214,6 +175,7 @@ GET http://localhost:5555/stats
 |---|---|---|
 | `APP_ENV` | `dev` | 可选 `dev` / `test` / `prod` |
 | `APP_DEBUG` | `dev` 下为 `true` | Flask 调试模式 |
+| `APP_PROD_METHOD` | `gevent` | `prod` 下的 WSGI 容器：`gevent` / `tornado` / `meinheld`（后两者需自行安装） |
 
 ### Redis 连接
 
@@ -245,14 +207,13 @@ GET http://localhost:5555/stats
 |---|---|---|
 | `PROXY_NUMBER_MAX` | `3000` | 池子上限 |
 | `PROXY_SCORE_INIT` | `10` | 新代理入池初始分 |
-| `INTRODUCE_WINDOW` | `600` | 新代理首次检测打散窗口（秒） |
+| `INTRODUCE_WINDOW` | `900` | 新代理首次检测打散窗口（秒） |
 | `CYCLE_TESTER` | `20` | 检测器每轮的时间预算（秒） |
 | `CYCLE_GETTER` | `300` | 抓取周期（秒） |
 | `PROBE_MAX_AGE` | `180` | 分发新鲜度闸门（秒） |
 | `GET_TIMEOUT` | `10` | 爬虫请求超时 |
 
-> 上限不是越大越好。`fresh` 的天花板 ≈ 检测吞吐 × 可用率 × 新鲜窗口，和池子大小无关。
-> 池子开到 10000 时 `fresh` 只有 50 左右，3000 时也有 40 左右——多出来的两万个代理只会摊薄检测频率。
+> 上限不是越大越好。`fresh` 的天花板 ≈ 检测吞吐 × 可用率 × 新鲜窗口，和池子大小无关：上限调大之后，每个代理被复检的间隔会跟着变长，多出来的代理只会摊薄检测频率。
 
 ### API 与日志
 
@@ -265,6 +226,29 @@ GET http://localhost:5555/stats
 | `ENABLE_LOG_FILE` | `true` | 是否写日志文件 |
 | `LOG_ROTATION` | `500MB` | 日志轮转大小 |
 | `LOG_RETENTION` | `1 week` | 日志保留时长 |
+
+## 探测目标怎么选
+
+**这是整套系统里最需要想清楚的一件事**：探测器会对目标发请求，池子越大，请求越多。
+
+默认用的是 `http://cp.cloudflare.com/`——Cloudflare 专门为「连通性检测」提供的端点，返回 204、0 字节，面向海量探测设计。拿它当探针，等于不占用任何人的带宽，也不会把谁打限速。
+
+**不要拿别人的内容站当探针。** 我实测过：拿某资讯站（首页 271KB）当目标，跑几万个代理之后，对方直接把我本机 IP 限速到 11 秒响应。这不是「测试」，这是小型 CC。
+
+所以推荐的分工是：
+
+| key | 目标 | 用途 |
+|---|---|---|
+| `default` | `http://cp.cloudflare.com/` | 通用池：只验证「代理能正常代理 HTTP」 |
+| 你的站 | 你自己的目标页 | 专用池：额外验证「代理能打开这个站」 |
+
+```ini
+PROBE_TARGETS={"default":[{"url":"http://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://你的站/","min_len":3000}]}
+```
+
+然后 `GET /random?key=mysite`。两个池子的分数完全独立：一个代理在 `default` 里可能 95 分，在你的站上 0 分。
+
+如果你有服务器，最稳的做法是自己起一个端点（返回 204 或一句固定文本），把它写进 `PROBE_TARGETS`——完全不依赖第三方。
 
 ## 扩展代理爬虫
 
@@ -311,23 +295,36 @@ class ExampleCrawler(BaseCrawler):
 
 原来那批国内站（daili66、kuaidaili、ip3366、xicidaili、zhandaye 等）已经不抓了：一部分真的关站/改版，一部分是页面结构变了导致 `parse` 取不到数据。这些站现在大多要登录或上了反爬，性价比很低。
 
+想知道此刻每个源还能抓多少：`python3 tools/measure_crawlers.py`（只统计，不写库）。
+
+## 开发
+
+```bash
+pip install ruff pytest
+ruff check .      # 语法与风格检查，CI 跑的是同一条
+pytest            # 冒烟测试：需要本机有 Redis，用 db 5 和独立前缀，不碰正在运行的池
+```
+
+CI 在 Python 3.9 / 3.12、Redis 5 / 7 上跑这两条命令。
+
 ## 目录
 
 ```
 proxyproof/
-  probe/        判定规则、探测端点、漏斗探测
+  probe/        四态判定规则、探测端点、漏斗探测
   storages/     池存储（ZSET + hash + 新鲜度索引）
   processors/   getter / tester / server
   crawlers/     26 个代理源，public/ 下每个文件一个源
   schemas/      Proxy
   setting.py    全部配置
+tests/                  冒烟测试（pytest）
 tools/
   stop.py               停掉本项目所有进程
   measure_crawlers.py   量每个爬虫能抓多少条（不写库）
-  eval_baseline.py      按 EVAL_STANDARD 算评测指标
-  samples/              抽样原始数据（本地评测用，已 gitignore）
+  eval_baseline.py      开发期的离线评测脚本（输入样本不入库，见文件头说明）
 examples/usage.py       接入示例（含 /report 反馈）
 run.py                  入口，--processor 可单独跑
+ruff.toml · pytest.ini  lint 与测试配置
 ```
 
 ## 来源与致谢

@@ -1,13 +1,27 @@
-import time
 import multiprocessing
-from proxyproof.processors.server import app
-from proxyproof.processors.getter import Getter
-from proxyproof.processors.tester import Tester
-from proxyproof.setting import APP_PROD_METHOD_GEVENT, APP_PROD_METHOD_MEINHELD, APP_PROD_METHOD_TORNADO, CYCLE_GETTER, CYCLE_TESTER, API_HOST, \
-    API_THREADED, API_PORT, ENABLE_SERVER, IS_PROD, APP_PROD_METHOD, \
-    ENABLE_GETTER, ENABLE_TESTER, IS_WINDOWS
+import time
+
 from loguru import logger
 
+from proxyproof.processors.getter import Getter
+from proxyproof.processors.server import app
+from proxyproof.processors.tester import Tester
+from proxyproof.setting import (
+    API_HOST,
+    API_PORT,
+    API_THREADED,
+    APP_PROD_METHOD,
+    APP_PROD_METHOD_GEVENT,
+    APP_PROD_METHOD_MEINHELD,
+    APP_PROD_METHOD_TORNADO,
+    CYCLE_GETTER,
+    CYCLE_TESTER,
+    ENABLE_GETTER,
+    ENABLE_SERVER,
+    ENABLE_TESTER,
+    IS_PROD,
+    IS_WINDOWS,
+)
 
 if IS_WINDOWS:
     multiprocessing.freeze_support()
@@ -15,7 +29,7 @@ if IS_WINDOWS:
 tester_process, getter_process, server_process = None, None, None
 
 
-class Scheduler():
+class Scheduler:
     """
     scheduler
     """
@@ -61,39 +75,36 @@ class Scheduler():
             logger.info('server not enabled, exit')
             return
         if IS_PROD:
+            # 缺依赖就明确报错退出。以前是 except ImportError 只打一条日志就 return，
+            # server 进程无声结束，调用方只看到端口连不上，要翻日志才知道是没装包。
             if APP_PROD_METHOD == APP_PROD_METHOD_GEVENT:
                 try:
                     from gevent.pywsgi import WSGIServer
                 except ImportError as e:
-                    logger.exception(e)
-                else:
-                    http_server = WSGIServer((API_HOST, API_PORT), app)
-                    http_server.serve_forever()
+                    raise RuntimeError('APP_PROD_METHOD=gevent，请先 pip install gevent') from e
+                WSGIServer((API_HOST, API_PORT), app).serve_forever()
 
             elif APP_PROD_METHOD == APP_PROD_METHOD_TORNADO:
                 try:
-                    from tornado.wsgi import WSGIContainer
                     from tornado.httpserver import HTTPServer
                     from tornado.ioloop import IOLoop
+                    from tornado.wsgi import WSGIContainer
                 except ImportError as e:
-                    logger.exception(e)
-                else:
-                    http_server = HTTPServer(WSGIContainer(app))
-                    http_server.listen(API_PORT)
-                    IOLoop.instance().start()
+                    raise RuntimeError('APP_PROD_METHOD=tornado，请先 pip install tornado') from e
+                HTTPServer(WSGIContainer(app)).listen(API_PORT)
+                IOLoop.instance().start()
 
             elif APP_PROD_METHOD == APP_PROD_METHOD_MEINHELD:
                 try:
                     import meinheld
                 except ImportError as e:
-                    logger.exception(e)
-                else:
-                    meinheld.listen((API_HOST, API_PORT))
-                    meinheld.run(app)
+                    raise RuntimeError('APP_PROD_METHOD=meinheld，请先 pip install meinheld') from e
+                meinheld.listen((API_HOST, API_PORT))
+                meinheld.run(app)
 
             else:
-                logger.error("unsupported APP_PROD_METHOD")
-                return
+                # setting.py 在导入时已经校验过，这里只是防御
+                raise ValueError(f'unsupported APP_PROD_METHOD={APP_PROD_METHOD!r}')
         else:
             app.run(host=API_HOST, port=API_PORT, threaded=API_THREADED, use_reloader=False)
 

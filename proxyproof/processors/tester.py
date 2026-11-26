@@ -12,11 +12,11 @@ from loguru import logger
 
 from proxyproof.probe.endpoint import all_keys
 from proxyproof.probe.matrix import Prober
-from proxyproof.setting import CYCLE_TESTER, PROBE_BATCH
+from proxyproof.setting import CYCLE_TESTER, PROBE_BATCH, PROBE_MAX_AGE
 from proxyproof.storages.pool import Pool
 
 
-class Tester(object):
+class Tester:
     def __init__(self):
         self.pool = Pool()
         self.keys = all_keys()
@@ -38,7 +38,7 @@ class Tester(object):
                     logger.info(f'{o.proxy} dropped, consecutive failures')
             popped += len(obs)
             logger.info(f'[{key}] probed {len(obs)} {summary} '
-                        f'fresh={self.pool.count(key, max_age=180)} '
+                        f'fresh={self.pool.count(key, max_age=PROBE_MAX_AGE)} '
                         f'total={self.pool.count(key)}')
         return popped
 
