@@ -264,7 +264,7 @@ GET http://localhost:5555/health
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `PROBE_TARGETS` | `{"default":[{"url":"http://cp.cloudflare.com/","min_len":0}]}` | 目标分组，JSON |
+| `PROBE_TARGETS` | `{"default":[{"url":"https://cp.cloudflare.com/","min_len":0}]}` | 目标分组，JSON |
 | `PROBE_IDENTITY_URLS` | `["http://ip.3322.net/","http://myip.ipip.net/"]` | 身份探针回退链，返回出口 IP |
 | `PROBE_TCP_TIMEOUT` | `0.8` | TCP 探测超时（秒） |
 | `PROBE_TIMEOUT_IDENTITY` | `3` | 身份探测超时 |
@@ -313,7 +313,7 @@ GET http://localhost:5555/health
 
 **这是整套系统里最需要想清楚的一件事**：探测器会对目标发请求，池子越大，请求越多。
 
-默认用的是 `http://cp.cloudflare.com/`——Cloudflare 专门为「连通性检测」提供的端点，返回 204、0 字节，面向海量探测设计。拿它当探针，等于不占用任何人的带宽，也不会把谁打限速。
+默认用的是 `https://cp.cloudflare.com/`——Cloudflare 专门为「连通性检测」提供的端点，返回 204、0 字节，面向海量探测设计。拿它当探针，等于不占用任何人的带宽，也不会把谁打限速。
 
 **不要拿别人的内容站当探针。** 我实测过：拿某资讯站（首页 271KB）当目标，跑几万个代理之后，对方直接把我本机 IP 限速到 11 秒响应。这不是「测试」，这是小型 CC。
 
@@ -321,11 +321,11 @@ GET http://localhost:5555/health
 
 | key | 目标 | 用途 |
 |---|---|---|
-| `default` | `http://cp.cloudflare.com/` | 通用池：只验证「代理能正常代理 HTTP」 |
+| `default` | `https://cp.cloudflare.com/` | 通用池：验证代理能对 HTTPS 建 CONNECT 隧道（这才是爬 https 站的前提） |
 | 你的站 | 你自己的目标页 | 专用池：额外验证「代理能打开这个站」 |
 
 ```ini
-PROBE_TARGETS={"default":[{"url":"http://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://你的站/","min_len":3000}]}
+PROBE_TARGETS={"default":[{"url":"https://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://你的站/","min_len":3000}]}
 ```
 
 然后 `GET /random?key=mysite`。两个池子的分数完全独立：一个代理在 `default` 里可能 95 分，在你的站上 0 分。

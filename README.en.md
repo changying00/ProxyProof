@@ -235,7 +235,7 @@ Everything is configured through environment variables, which can be written to 
 
 | Variable | Default | Description |
 |---|---|---|
-| `PROBE_TARGETS` | `{"default":[{"url":"http://cp.cloudflare.com/","min_len":0}]}` | target groups, JSON |
+| `PROBE_TARGETS` | `{"default":[{"url":"https://cp.cloudflare.com/","min_len":0}]}` | target groups, JSON |
 | `PROBE_IDENTITY_URLS` | `["http://ip.3322.net/","http://myip.ipip.net/"]` | identity-probe fallback chain; each returns the exit IP |
 | `PROBE_TCP_TIMEOUT` | `0.8` | TCP connect timeout (seconds) |
 | `PROBE_TIMEOUT_IDENTITY` | `3` | identity probe timeout |
@@ -281,7 +281,7 @@ Everything is configured through environment variables, which can be written to 
 
 **This is the one thing in the whole system worth thinking through carefully**: the tester sends requests to the target, and the bigger the pool, the more requests.
 
-The default is `http://cp.cloudflare.com/`, an endpoint Cloudflare provides specifically for connectivity checks. It returns 204 with zero bytes and is built for high-volume probing, so using it as a probe costs nobody bandwidth and gets nobody rate-limited.
+The default is `https://cp.cloudflare.com/`, an endpoint Cloudflare provides specifically for connectivity checks. It returns 204 with zero bytes and is built for high-volume probing, so using it as a probe costs nobody bandwidth and gets nobody rate-limited.
 
 **Don't use someone else's content site as a probe.** I tried it: with a news site (271 KB home page) as the target, after tens of thousands of proxies the site rate-limited my IP to 11-second responses. That isn't "testing", it's a small-scale flood.
 
@@ -289,11 +289,11 @@ The recommended split is therefore:
 
 | key | target | purpose |
 |---|---|---|
-| `default` | `http://cp.cloudflare.com/` | general pool: only verifies "the proxy can proxy HTTP" |
+| `default` | `https://cp.cloudflare.com/` | general pool: verifies the proxy can tunnel HTTPS via CONNECT — the real prerequisite for scraping https sites |
 | your site | your own target page | dedicated pool: additionally verifies "the proxy can open this site" |
 
 ```ini
-PROBE_TARGETS={"default":[{"url":"http://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://your-site/","min_len":3000}]}
+PROBE_TARGETS={"default":[{"url":"https://cp.cloudflare.com/","min_len":0}],"mysite":[{"url":"https://your-site/","min_len":3000}]}
 ```
 
 Then call `GET /random?key=mysite`. The two pools are scored completely independently: a proxy may score 95 under `default` and 0 on your site.

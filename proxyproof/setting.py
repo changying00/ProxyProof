@@ -123,8 +123,11 @@ PROBE_MAX_AGE = env.int('PROBE_MAX_AGE', 180)
 # 每个 key = 一组目标；API 用 ?key= 选择。min_len 用于过滤挑战页/空壳页
 # 默认目标是一个"用途就是被探测"的连通性端点：204、0 字节、为海量探测设计。
 # 不要拿别人的内容站当探针，会把人家打限速。
+# 必须用 https：现在绝大多数目标站都是 https，走代理要发 CONNECT 建隧道。
+# 用 http 目标探测的话，过不了 CONNECT 的代理也会被判定 OK 发出去，
+# 调用方一爬 https 站就全灭。
 PROBE_TARGETS = env.json('PROBE_TARGETS', {
-    'default': [{'url': 'http://cp.cloudflare.com/', 'min_len': 0}],
+    'default': [{'url': 'https://cp.cloudflare.com/', 'min_len': 0}],
 })
 # 可选的富化端点（仅新入池 + 24h 刷新，绝不每轮调用）
 PROBE_ENRICH_URL = env.str('PROBE_ENRICH_URL', '')
