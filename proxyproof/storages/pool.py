@@ -18,6 +18,7 @@ import redis
 from proxyproof.probe import verdict as V
 from proxyproof.probe.enrich import enrich
 from proxyproof.setting import (
+    ANON_MIN_LEVEL,
     INTRODUCE_WINDOW,
     PROXY_SCORE_INIT,
     REDIS_CONNECTION_STRING,
@@ -183,16 +184,19 @@ class Pool:
 
         if obs.exit_ip:
             self.meta_set(proxy, exit_ip=obs.exit_ip, anonymous=obs.anonymous,
-                          plain=obs.plain_ok)
+                          plain=obs.plain_ok, anon_level=obs.anon_level)
 
         meta = self.meta(proxy)
         risk = meta.get("risk")
         lat_factor = max(0.2, 500.0 / (500.0 + float(lat)))
         purity = (1.0 - min(risk, 150) / 150.0) if isinstance(risk, (int, float)) else 0.85
-        score = 0.0 if obs.verdict == V.DEAD else 100.0 * ewma * lat_factor * purity
+        # 匿名性加权：高匿满分，匿名 90%，透明不加分
+        anon_factor = {"elite": 1.0, "anonymous": 0.9, "transparent": 0.0}.get(obs.anon_level, 0.85)
+        score = 0.0 if obs.verdict == V.DEAD else 100.0 * ewma * lat_factor * purity * anon_factor
         self.db.zadd(self.k_score(key), {proxy: round(score, 3)})
 
-        if obs.verdict == V.OK and obs.anonymous is not False:
+        # 分发门槛：匿名性不达标不进 fresh（ANON_MIN_LEVEL 控制）
+        if obs.verdict == V.OK and obs.anonymous is not False and self._anon_ok(obs.anon_level):
             self.db.zadd(self.k_fresh(key), {proxy: obs.ts})
 
         if V.should_drop(obs.verdict, streak):
@@ -293,6 +297,14 @@ class Pool:
             return []
         scored.sort(reverse=True)
         return [p for _, p in scored[:count]]
+
+    def _anon_ok(self, anon_level):
+        """匿名性门槛：ANON_MIN_LEVEL='' 不限；'anonymous' 排除 transparent；'elite' 只要高匿"""
+        if not ANON_MIN_LEVEL:
+            return True
+        rank = {"transparent": 0, "anonymous": 1, "elite": 2, "unknown": 3}
+        min_rank = rank.get(ANON_MIN_LEVEL, 3)
+        return rank.get(anon_level, 3) >= min_rank
 
     def serve_inc(self, key, proxy):
         stat = _loads(self.db.hget(self.k_stat(key), proxy))

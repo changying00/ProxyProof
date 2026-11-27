@@ -98,6 +98,33 @@ python3 run.py --processor server
 
 探测目标该怎么选、为什么默认是 `cp.cloudflare.com`，见[探测目标怎么选](#探测目标怎么选)。
 
+## 匿名性筛选
+
+免费代理大部分是**透明代理**——你的真实 IP 会泄露给目标站，爬东西等于裸奔。本项目在探测时自动检测匿名等级，分三级：
+
+| 等级 | 含义 | 评分系数 | 默认行为 |
+|---|---|---|---|
+| `elite`（高匿） | 不透传你的 IP，也不暴露代理身份 | ×1.0 | 正常分发 |
+| `anonymous`（匿名） | 藏了你的 IP，但暴露了代理身份 | ×0.9 | 正常分发 |
+| `transparent`（透明） | 你的真实 IP 直接泄露给目标站 | ×0.0 | 不分发 |
+| `unknown` | 未能检测 | ×0.85 | 正常分发 |
+
+检测方法：经代理请求 `http://httpbin.org/headers`，检查目标站收到的请求头里有没有你的 IP（透明）、有没有 `Via`/`X-Forwarded-For` 等代理头（匿名）。
+
+想只发高匿代理（推荐爬淘宝/安居客时用）：
+
+```ini
+ANON_MIN_LEVEL=elite
+```
+
+设置后只有 `elite` 代理会进 `fresh` 池。注意免费代理里高匿的极少（实测不到 5%），开了这个选项池子会小很多。
+
+检测端点可换成自建的（免费且不限量）：
+
+```ini
+PROBE_ANON_CHECK_URL=http://你的服务器/headers
+```
+
 ## 使用
 
 ```bash
@@ -233,6 +260,8 @@ GET http://localhost:5555/health
 | `PROBE_TIMEOUT_TARGET` | `6` | 目标探测超时 |
 | `PROBE_CONCURRENCY` | `100` | 探测并发数 |
 | `PROBE_BATCH` | `200` | 单批探测数量 |
+| `PROBE_ANON_CHECK_URL` | `http://httpbin.org/headers` | 匿名性检测端点（回显请求头的 JSON） |
+| `ANON_MIN_LEVEL` | 空 | 分发匿名门槛：空=不限 / `anonymous` / `elite` |
 
 `min_len` 是响应体长度下限，用来排掉挑战页和空壳页。204 端点设为 0。
 

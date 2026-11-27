@@ -82,6 +82,29 @@ ProxyProof scores `(proxy × target × moment)`:
 
 How to choose a probe target, and why the default is `cp.cloudflare.com`: [Choosing probe targets](#choosing-probe-targets).
 
+## Anonymity filtering
+
+Most free proxies are **transparent** — your real IP leaks to the target site. This project detects anonymity level during probing:
+
+| Level | Meaning | Score factor | Default behavior |
+|---|---|---|---|
+| `elite` | Hides your IP and the proxy identity | ×1.0 | served normally |
+| `anonymous` | Hides your IP but exposes proxy identity | ×0.9 | served normally |
+| `transparent` | Your real IP leaks to the target | ×0.0 | never served |
+| `unknown` | Detection failed | ×0.85 | served normally |
+
+Detection method: request `http://httpbin.org/headers` through the proxy and check the echoed request headers. To serve only high-anonymity proxies (recommended for scraping):
+
+```ini
+ANON_MIN_LEVEL=elite
+```
+
+Note: elite free proxies are rare (< 5%), so the pool will shrink significantly. The detection endpoint can be self-hosted for unlimited use:
+
+```ini
+PROBE_ANON_CHECK_URL=http://your-server/headers
+```
+
 ## Usage
 
 ```bash
@@ -196,6 +219,8 @@ Everything is configured through environment variables, which can be written to 
 | `PROBE_TIMEOUT_TARGET` | `6` | target probe timeout |
 | `PROBE_CONCURRENCY` | `100` | concurrent probes |
 | `PROBE_BATCH` | `200` | proxies probed per batch |
+| `PROBE_ANON_CHECK_URL` | `http://httpbin.org/headers` | anonymity detection endpoint (JSON echo of request headers) |
+| `ANON_MIN_LEVEL` | empty | serve-only filter: empty=no limit / `anonymous` / `elite` |
 
 `min_len` is the minimum response body length, used to filter out challenge pages and empty shells. Set it to 0 for 204 endpoints.
 

@@ -16,8 +16,10 @@ from typing import Optional
 import aiohttp
 
 from proxyproof.probe import verdict as V
+from proxyproof.probe.anonymity import classify_anonymity, parse_headers_response
 from proxyproof.probe.endpoint import Baseline, targets
 from proxyproof.setting import (
+    PROBE_ANON_CHECK_URL,
     PROBE_CONCURRENCY,
     PROBE_IDENTITY_URL,
     PROBE_IDENTITY_URLS,
@@ -41,6 +43,7 @@ class Observation:
     target_status: int = 0
     target_len: int = 0
     anonymous: Optional[bool] = None
+    anon_level: str = "unknown"  # transparent / anonymous / elite / unknown
     plain_ok: bool = False
     err: Optional[str] = None
     ts: int = field(default_factory=lambda: int(time.time()))
@@ -140,6 +143,25 @@ class Prober:
             obs.exit_ip = ip
             obs.lat_ms = ms
             obs.anonymous = not self._baseline.is_self(ip)
+
+        # 匿名性三级检测：请求回显请求头的端点，判断透明/匿名/高匿
+        if PROBE_ANON_CHECK_URL and obs.plain_ok:
+            status, body, _, err = await self._get(PROBE_ANON_CHECK_URL, proxy, self.timeout_identity)
+            if status == 200:
+                headers = parse_headers_response(body)
+                if headers:
+                    real_ip = self._baseline.exact or {""}
+                    for rip in real_ip:
+                        level = classify_anonymity(headers, rip)
+                        if level != "transparent":
+                            obs.anon_level = level
+                            break
+                    else:
+                        obs.anon_level = "transparent"
+                else:
+                    obs.anon_level = "unknown"
+            else:
+                obs.anon_level = "unknown"
 
         tgts = targets(key)
         if not tgts:

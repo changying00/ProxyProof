@@ -99,6 +99,11 @@ PROBE_IDENTITY_URLS = env.json('PROBE_IDENTITY_URLS',
 # 本机出口 IP 会轮换（实测同一分钟出现过 182.118.238.2/.14/.39 和 IPv6），
 # 所以基线是一组样本 + TTL，不是单个 IP
 PROBE_BASELINE_TTL = env.int('PROBE_BASELINE_TTL', 600)
+# 匿名性检测：请求这个 URL 能拿到目标站看到的请求头，判断透明/匿名/高匿
+# httpbin.org/headers 返回 JSON {"headers": {...}}，也可换成自建端点
+PROBE_ANON_CHECK_URL = env.str('PROBE_ANON_CHECK_URL', 'http://httpbin.org/headers')
+# 只发高匿代理：开启后 transparent/anonymous 的代理不进 fresh
+ANON_MIN_LEVEL = env.str('ANON_MIN_LEVEL', '')  # ''=不限 / 'anonymous' / 'elite'
 PROBE_TCP_TIMEOUT = env.float('PROBE_TCP_TIMEOUT', 0.8)
 PROBE_TIMEOUT_IDENTITY = env.float('PROBE_TIMEOUT_IDENTITY', 3.0)
 PROBE_TIMEOUT_TARGET = env.float('PROBE_TIMEOUT_TARGET', 6.0)
