@@ -35,6 +35,12 @@ services:
       API_HOST: 0.0.0.0
       APP_ENV: prod
       ENABLE_LOG_FILE: "false"
+    logging:
+      # stdout 日志由 Docker 轮转：单文件 10MB，最多留 3 个，否则占用无限涨
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       redis:
         condition: service_healthy
