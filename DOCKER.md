@@ -2,6 +2,16 @@
 
 > 前提：服务器上有 Docker 和 docker compose v2。本机有 Docker Desktop 时同样适用。
 
+## 一键部署（推荐）
+
+Ubuntu / Debian 上一条命令完成全部步骤（自动装 Docker、拉代码、生成配置、启动）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/changying00/ProxyProof/master/deploy.sh | bash
+```
+
+换端口：`bash deploy.sh 18473`。后面的手动步骤如果你喜欢自己控制每一步，继续往下看。
+
 ## 一、准备
 
 ```bash

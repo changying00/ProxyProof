@@ -31,15 +31,26 @@ $ curl localhost:5555/stats             # 池子现状
 
 ## 快速开始
 
-### Docker（推荐）
+### Docker 一键部署（推荐，Ubuntu/Debian）
+
+一条命令搞定（装 Docker → 拉代码 → 配置 → 启动）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/changying00/ProxyProof/master/deploy.sh | bash
+```
+
+完成后自动输出 API 地址和监控地址。换端口：`bash deploy.sh 18473`。
+
+### Docker 手动部署
 
 需要 Docker 和 compose v2。更详细的部署说明见 [DOCKER.md](./DOCKER.md)。
 
 ```bash
 git clone https://github.com/changying00/ProxyProof.git
 cd ProxyProof
-cp .env.example .env      # 在 .env 里设置 API_KEY（公网必填）和探测目标
-docker compose up -d --build
+cp .env.example .env      # 按需改探测目标和端口
+docker compose pull       # 用预构建镜像（快）
+docker compose up -d
 curl http://127.0.0.1:5555/random
 ```
 

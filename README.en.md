@@ -31,6 +31,29 @@ $ curl localhost:5555/stats             # state of the pool
 
 ## Quick start
 
+### Docker one-liner (recommended, Ubuntu/Debian)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/changying00/ProxyProof/master/deploy.sh | bash
+```
+
+Installs Docker, pulls the code, generates config, and starts. API and monitoring URLs print on completion. Custom port: `bash deploy.sh 18473`.
+
+### Docker manual
+
+```bash
+git clone https://github.com/changying00/ProxyProof.git
+cd ProxyProof
+cp .env.example .env
+docker compose pull    # use pre-built image (fast)
+docker compose up -d
+curl http://127.0.0.1:5555/random
+```
+
+See [DOCKER.md](./DOCKER.md) for details.
+
+### Python
+
 Requires Python >= 3.9 and Redis 5.0 or newer (it does not rely on `ZRANDMEMBER`, which only arrived in 6.2).
 
 ```bash
