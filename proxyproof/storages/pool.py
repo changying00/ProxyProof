@@ -24,6 +24,7 @@ from proxyproof.setting import (
     REDIS_HOST,
     REDIS_PASSWORD,
     REDIS_PORT,
+    SOURCE_WEIGHTS,
 )
 
 POP_LUA = """
@@ -93,10 +94,12 @@ class Pool:
         self.ensure_key(key)
         if not self.db.hexists(self.k_meta(), proxy):
             self.meta_set(proxy, first_seen=int(time.time()), src=src)
-        init = PROXY_SCORE_INIT if score is None else score
-        self.db.zadd(self.k_score(key), {proxy: init}, nx=True)
+        # 来源加权：好源初始分高（排更前面），坏源首检排得更远
+        w = SOURCE_WEIGHTS.get(src, 1.0) if src else 1.0
+        init = (PROXY_SCORE_INIT if score is None else score) * w
+        self.db.zadd(self.k_score(key), {proxy: round(init, 3)}, nx=True)
         if self.db.zscore(self.k_due(key), proxy) is None:
-            window = max(60, INTRODUCE_WINDOW)
+            window = max(60, int(INTRODUCE_WINDOW / max(w, 0.3)))
             self.db.zadd(self.k_due(key), {proxy: int(time.time()) + random.randint(0, window)})
         return True
 

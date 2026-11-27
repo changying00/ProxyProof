@@ -36,7 +36,7 @@ class BaseCrawler:
         used for parse html
         """
         for proxy in self.parse(html):
-            logger.info(f'fetched proxy {proxy.string()} from {url}')
+            logger.debug(f'fetched proxy {proxy.string()} from {url}')
             yield proxy
 
     def crawl(self):

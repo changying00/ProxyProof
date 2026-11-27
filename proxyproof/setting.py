@@ -55,6 +55,20 @@ REDIS_CONNECTION_STRING = env.str(
 # definition of proxy scores
 # 新代理入池分数（不是满分，也不是 0）：满分 100 由评分公式算出
 PROXY_SCORE_INIT = env.int('PROXY_SCORE_INIT', 10)
+# 按来源加权：好源的代理初始分高、首检排得靠前（实测 AdvancedName 可用率 12%，
+# 高产低质源 0.2%~1.4%）。没列出的源权重 1.0
+SOURCE_WEIGHTS = env.json('SOURCE_WEIGHTS', {
+    'AdvancedNameCrawler': 2.5,
+    'ShiftyTRCrawler': 1.5,
+    'KxDailiCrawler': 1.5,
+    'IhuanCrawler': 1.5,
+    'PrxchkCrawler': 1.5,
+    'OpenProxyListCrawler': 0.5,
+    'Proxy4ParsingCrawler': 0.5,
+    'GeonodeCrawler': 0.5,
+    'JetkaiCrawler': 0.5,
+    'B4RC0DECrawler': 0.5,
+})
 
 # definition of proxy number
 PROXY_NUMBER_MAX = env.int('PROXY_NUMBER_MAX', 3000)
