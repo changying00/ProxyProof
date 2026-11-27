@@ -15,7 +15,9 @@ from collections import Counter
 import aiohttp
 
 POOL_API = 'http://127.0.0.1:5555'
-TARGET = sys.argv[1] if len(sys.argv) > 1 else 'https://www.zongheng.com/'
+# 默认目标必须和池子的探测目标（.env 里的 PROBE_TARGETS）一致，
+# 否则测的是两回事。要验别的站，命令行传 URL 覆盖
+TARGET = sys.argv[1] if len(sys.argv) > 1 else 'http://cp.cloudflare.com/'
 N_SAMPLE = int(sys.argv[2]) if len(sys.argv) > 2 else 12
 
 
@@ -30,11 +32,18 @@ async def probe(sess, proxy):
 
 
 async def main():
+    # 本脚本只跟本机代理池通信，绝不走系统代理。
+    # 显式 build_opener(ProxyHandler({})) 可以绕过 HTTP_PROXY/HTTPS_PROXY 环境变量
+    #（Clash 常驻后这两个变量会被设成 127.0.0.1:7897，不处理的话 urllib 会把
+    # 对 5555 的请求也丢给 Clash，Clash 拒连回环地址 → 报一堆看不懂的错误）
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    stats = json.loads(opener.open(POOL_API + '/stats', timeout=8).read())
-    print('stats:', json.dumps(stats, ensure_ascii=False))
-
-    proxies = opener.open(POOL_API + '/all?max_age=300', timeout=8).read().decode().splitlines()
+    try:
+        stats = json.loads(opener.open(POOL_API + '/stats', timeout=8).read())
+        proxies = opener.open(POOL_API + '/all?max_age=300', timeout=8).read().decode().splitlines()
+    except OSError as e:
+        print(f'连不上代理池 {POOL_API}：{e}')
+        print('先确认池子在跑：docker compose up -d，然后重试。')
+        return
     proxies = [p for p in proxies if p.strip()]
     n = min(N_SAMPLE, len(proxies))
     print(f'fresh 候选 {len(proxies)} 个，抽 {n} 个实测')
