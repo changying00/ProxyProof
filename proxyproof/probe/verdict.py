@@ -47,6 +47,22 @@ def looks_challenged(status, body):
     return any(m in head for m in CHALLENGE_MARKERS)
 
 
+def looks_hijacked(body):
+    """代理劫持页：200 但内容是 JS 跳转/广告壳，不是目标站的真实页面。
+
+    免费代理常见套路——连上了，返回自己的一张跳转页。状态码 200、长度也够，
+    只看这两项会当成"可用"，调用方拿到手的却是壳子。
+    """
+    if not body:
+        return False
+    head = body[:600].lower()
+    if "proxy authentication required" in head or "407 proxy" in head:
+        return True
+    # 真实页面极少以裸 script 跳转开头（没有 doctype / html 标签）
+    has_redirect = "location.replace" in head or "location.href" in head or "window.location" in head
+    return has_redirect and "<!doctype" not in head
+
+
 def is_target_ok(status, body, min_len=0):
     """目标响应是否算通过"""
     if status not in VALID_STATUS:
@@ -54,6 +70,8 @@ def is_target_ok(status, body, min_len=0):
     if min_len and len(body or "") < min_len:
         return False
     if looks_challenged(status, body):
+        return False
+    if looks_hijacked(body):
         return False
     return True
 

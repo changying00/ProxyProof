@@ -377,6 +377,8 @@ class ExampleCrawler(BaseCrawler):
 | 高质量 | AdvancedName | 只有 300 条，可用率 12% |
 | 少量 | ShiftyTR、KxDaili、Ihuan、Prxchk | 几十条 |
 
+免费代理还有两类「假可用」，判定时要挡掉：**要求认证**（返回 407 `Proxy Authentication Required`，只有账号密码才放行）和**劫持页**（状态 200 但正文是它自己的 JS 跳转广告壳）。这两种现在都判为不可用，见 `probe/verdict.py` 的 `looks_hijacked()`。
+
 原来那批国内站（daili66、kuaidaili、ip3366、xicidaili、zhandaye 等）已经不抓了：一部分真的关站/改版，一部分是页面结构变了导致 `parse` 取不到数据。这些站现在大多要登录或上了反爬，性价比很低。
 
 想知道此刻每个源还能抓多少：`python3 tools/measure_crawlers.py`（只统计，不写库）。

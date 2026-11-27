@@ -143,6 +143,10 @@ class Prober:
             obs.exit_ip = ip
             obs.lat_ms = ms
             obs.anonymous = not self._baseline.is_self(ip)
+        elif status == 407:
+            # 代理要求认证：账号密码不在池子的能力范围内，直接判死
+            obs.verdict, obs.err = V.DEAD, "ProxyAuth"
+            return obs
 
         # 匿名性三级检测：请求回显请求头的端点，判断透明/匿名/高匿
         if PROBE_ANON_CHECK_URL and obs.plain_ok:
