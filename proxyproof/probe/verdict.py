@@ -65,7 +65,9 @@ def next_check_delay(verdict, streak=0):
     否则代理会在"刚过期"和"下次复检"之间留出一段空窗，池子永远发不出东西。
     """
     if verdict == OK:
-        return 60
+        # 免费代理 TTL 秒级：复检越快，fresh 里「已经死了但还没被发现」的越少。
+        # 实测 45s 复检下 fresh 仍有 ~60% 拿出去即死；30s 是吞吐和时效的平衡点
+        return 30
     if verdict == BLOCKED:
         return 600
     if verdict == DEAD:

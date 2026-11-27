@@ -72,8 +72,10 @@ GET_TIMEOUT = env.int('GET_TIMEOUT', 10)
 PROBE_IDENTITY_URL = env.str('PROBE_IDENTITY_URL', 'http://ip.3322.net/')
 # 身份探测的回退链：国内不同出口对个别站点的可达性差异很大，单一端点会制造 UNKNOWN
 # 注意用 JSON（env.list 会按逗号切分，写 JSON 数组会解析成一堆带引号的碎片）
+# 第一个换成 ip 直出的端点（3322 是公网测试池，偶发被墙；api.ipify.org 稳定且无地域差异）
 PROBE_IDENTITY_URLS = env.json('PROBE_IDENTITY_URLS',
-                               ['http://ip.3322.net/', 'http://myip.ipip.net/'])
+                               ['https://api.ipify.org?format=json', 'http://ip.3322.net/',
+                                'http://myip.ipip.net/'])
 # 本机出口 IP 会轮换（实测同一分钟出现过 182.118.238.2/.14/.39 和 IPv6），
 # 所以基线是一组样本 + TTL，不是单个 IP
 PROBE_BASELINE_TTL = env.int('PROBE_BASELINE_TTL', 600)

@@ -278,6 +278,9 @@ class Pool:
             stat["ok"] = stat.get("ok", 0) + 1
             stat["ewma"] = round(0.7 * stat.get("ewma", 0.5) + 0.3, 4)
             self.db.zadd(self.k_fresh(key), {proxy: int(time.time())})
+            # 成功反馈 = 一次免费的真实验证，刷新新鲜度并排进热队列优先复检，
+            # 这样高频使用的代理在池子里保持有效（之前这里只改 fresh 不排复检）
+            self.db.zadd(self.k_hot(key), {proxy: int(time.time())})
         else:
             stat["fail"] = stat.get("fail", 0) + 1
             stat["ewma"] = round(0.7 * stat.get("ewma", 0.5), 4)
