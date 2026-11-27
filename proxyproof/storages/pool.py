@@ -16,6 +16,7 @@ import time
 import redis
 
 from proxyproof.probe import verdict as V
+from proxyproof.probe.enrich import enrich
 from proxyproof.setting import (
     INTRODUCE_WINDOW,
     PROXY_SCORE_INIT,
@@ -25,6 +26,7 @@ from proxyproof.setting import (
     REDIS_PASSWORD,
     REDIS_PORT,
     SOURCE_WEIGHTS,
+    ZOMBIE_TTL,
 )
 
 POP_LUA = """
@@ -94,6 +96,10 @@ class Pool:
         self.ensure_key(key)
         if not self.db.hexists(self.k_meta(), proxy):
             self.meta_set(proxy, first_seen=int(time.time()), src=src)
+            # IP 质量富化：入池时标 risk/asn/country（PROBE_ENRICH_URL 为空则跳过）
+            enriched = enrich(proxy.rpartition(':')[0], self.meta(proxy))
+            if enriched:
+                self.meta_set(proxy, **enriched)
         # 来源加权：好源初始分高（排更前面），坏源首检排得更远
         w = SOURCE_WEIGHTS.get(src, 1.0) if src else 1.0
         init = (PROXY_SCORE_INIT if score is None else score) * w
@@ -212,6 +218,26 @@ class Pool:
             self.db.srem(self.k_live(k), proxy)
             self.db.hdel(self.k_stat(k), proxy)
         self.db.hdel(self.k_meta(), proxy)
+
+    # ---------- 僵尸清理 ----------
+    def clean_zombies(self, key, ttl=None):
+        """清理 N 秒内没 OK 过的代理。在 tester 每轮调用一次。"""
+        ttl = ttl or ZOMBIE_TTL
+        cutoff = int(time.time()) - ttl
+        removed = 0
+        cursor = 0
+        while True:
+            cursor, items = self.db.hscan(self.k_stat(key), cursor, count=500)
+            pairs = items.items() if isinstance(items, dict) else items
+            for proxy, raw in pairs:
+                stat = _loads(raw)
+                last_ok = stat.get("last_ok", 0)
+                if last_ok and last_ok < cutoff:
+                    self.drop(proxy, key)
+                    removed += 1
+            if cursor == 0:
+                break
+        return removed
 
     # ---------- 分发 ----------
     def prune_fresh(self, key, max_age, force=False):

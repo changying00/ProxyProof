@@ -69,6 +69,9 @@ SOURCE_WEIGHTS = env.json('SOURCE_WEIGHTS', {
     'JetkaiCrawler': 0.5,
     'B4RC0DECrawler': 0.5,
 })
+# 僵尸代理清理：N 秒内没 OK 过的代理直接删除。免费代理生命周期分钟级，
+# 不清理的话池子会被"偶尔活一次"的死代理占满
+ZOMBIE_TTL = env.int('ZOMBIE_TTL', 7 * 24 * 3600)  # 7 天
 
 # definition of proxy number
 PROXY_NUMBER_MAX = env.int('PROXY_NUMBER_MAX', 3000)

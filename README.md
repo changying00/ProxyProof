@@ -184,6 +184,14 @@ GET http://localhost:5555/stats
 
 返回每个 key 的 `total`（池内总数）、`fresh`（新鲜可用）、`due`（待检测）、`verdicts`（最近判定分布）。
 
+### 健康检查
+
+```
+GET http://localhost:5555/health
+```
+
+返回 `200 ok`（正常）或 `503`（Redis 不可达）。给 Uptime Kuma / UptimeRobot 等监控系统用。
+
 ## 可配置项
 
 所有配置通过环境变量设置，可以写进项目根目录的 `.env`（`environs` 会自动读取）。完整清单见 [.env.example](./.env.example)。
@@ -236,6 +244,9 @@ GET http://localhost:5555/stats
 | `PROXY_SCORE_INIT` | `10` | 新代理入池初始分 |
 | `SOURCE_WEIGHTS` | 见下 | 按来源加权（好源初始分高、首检排前面） |
 | `CN_ONLY` | `false` | `true` 时只收国内段 IP（源头过滤） |
+| `ZOMBIE_TTL` | `604800` | 僵尸清理：N 秒内没 OK 过就删（默认 7 天） |
+| `PROBE_ENRICH_URL` | 空 | IP 质量富化 API（如 `http://ip-api.com/json/{ip}`），留空不富化 |
+| `PROBE_ENRICH_TTL` | `86400` | 富化结果刷新周期（秒） |
 | `INTRODUCE_WINDOW` | `900` | 新代理首次检测打散窗口（秒） |
 | `CYCLE_TESTER` | `20` | 检测器每轮的时间预算（秒） |
 | `CYCLE_GETTER` | `300` | 抓取周期（秒） |

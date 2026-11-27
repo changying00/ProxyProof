@@ -15,3 +15,32 @@ os.environ["LOG_DIR"] = tempfile.mkdtemp(prefix="proxyproof-test-")  # 日志别
 for _name in list(os.environ):
     if _name.startswith("PROXYPROOF_REDIS_"):
         del os.environ[_name]
+
+import pytest  # noqa: E402
+
+from proxyproof.processors import server  # noqa: E402
+from proxyproof.storages.pool import Pool  # noqa: E402
+
+TEST_PREFIX = "proxyproof-test"
+
+
+def wipe(pool):
+    keys = pool.db.keys(f"{TEST_PREFIX}:*")
+    if keys:
+        pool.db.delete(*keys)
+
+
+@pytest.fixture
+def pool():
+    p = Pool(prefix=TEST_PREFIX)
+    wipe(p)
+    yield p
+    wipe(p)
+
+
+@pytest.fixture
+def client(pool, monkeypatch):
+    monkeypatch.setattr(server, "_pool", pool)  # API 走测试自己的池，而不是模块级默认前缀的那个
+    server.app.config["TESTING"] = True
+    with server.app.test_client() as c:
+        yield c

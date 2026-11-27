@@ -21,6 +21,7 @@ class Tester:
         self.pool = Pool()
         self.keys = all_keys()
         self._last_reseed = 0.0
+        self._last_zombie = 0.0
 
     async def _pass(self, key, budget_until):
         popped = 0
@@ -60,6 +61,12 @@ class Tester:
                 if n:
                     logger.warning(f'[{key}] reseeded {n} proxies into due queue (crash recovery)')
             total += await self._pass(key, budget_until)
+            # 每轮顺手清理僵尸（7 天没 OK 过的），频率限制到 1 小时一次
+            if time.time() - self._last_zombie > 3600:
+                removed = self.pool.clean_zombies(key)
+                self._last_zombie = time.time()
+                if removed:
+                    logger.info(f'[{key}] cleaned {removed} zombie proxies')
         return total
 
     def run(self):

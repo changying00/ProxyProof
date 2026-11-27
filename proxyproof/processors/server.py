@@ -51,6 +51,17 @@ def handle_empty(e):
     return jsonify({"message": "pool is empty", "hint": "retry later or switch key"}), 503
 
 
+@app.route('/health')
+@auth_required
+def health():
+    """健康检查：200=正常。给监控系统用（Uptime Kuma / UptimeRobot）。"""
+    try:
+        _pool.count(all_keys()[0] if all_keys() else "default")
+        return "ok", 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)[:200]}), 503
+
+
 @app.route('/')
 @auth_required
 def index():
