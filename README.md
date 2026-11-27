@@ -155,6 +155,17 @@ GET http://localhost:5555/count?key=mysite
 
 两个池子的分数完全独立：一个代理在 `default` 里可能 95 分，在你的站上 0 分。
 
+### 国内站专用池（CN_ONLY）
+
+爬淘宝/拼多多这类按 IP 段封机房地址的站，海外代理毫无价值。设 `CN_ONLY=true` 后 getter 在**源头**丢弃海外段 IP，整个池子只收国内段：
+
+```ini
+CN_ONLY=true
+PROBE_TARGETS={"default":[{"url":"https://www.baidu.com/","min_len":500}]}
+```
+
+然后 `GET /random?key=default` 拿到的就都是国内段、且经国内站点验证过的代理。
+
 ### 上报使用结果
 
 调用方的一次真实失败，比探测器十次探测更有信息量：
