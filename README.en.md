@@ -171,7 +171,7 @@ Everything is configured through environment variables, which can be written to 
 
 | Variable | Default | Description |
 |---|---|---|
-| `APP_ENV` | `dev` | `dev` / `test` / `prod` |
+| `APP_ENV` | `dev` | `dev` (DEBUG logs) / `test` (INFO logs, recommended for daily use) / `prod` (ERROR) |
 | `APP_DEBUG` | `true` under `dev` | Flask debug mode |
 | `APP_PROD_METHOD` | `gevent` | WSGI container under `prod`: `gevent` / `tornado` / `meinheld` (install the latter two yourself) |
 
@@ -205,11 +205,15 @@ Everything is configured through environment variables, which can be written to 
 |---|---|---|
 | `PROXY_NUMBER_MAX` | `3000` | pool capacity |
 | `PROXY_SCORE_INIT` | `10` | initial score of a new proxy |
+| `SOURCE_WEIGHTS` | see below | per-source weighting (good sources score higher and are probed first) |
+| `CN_ONLY` | `false` | when `true`, only mainland-China IP segments are kept (filtered at ingest) |
 | `INTRODUCE_WINDOW` | `900` | window (seconds) over which new proxies are spread for their first probe |
 | `CYCLE_TESTER` | `20` | tester time budget per cycle (seconds) |
 | `CYCLE_GETTER` | `300` | crawl interval (seconds) |
-| `PROBE_MAX_AGE` | `180` | freshness gate for serving (seconds) |
+| `PROBE_MAX_AGE` | `120` | freshness gate for serving (seconds); keep ≥ OK recheck interval (30 s) |
 | `GET_TIMEOUT` | `10` | crawler request timeout |
+
+`SOURCE_WEIGHTS` defaults (JSON, overridable): good sources `AdvancedNameCrawler: 2.5`, `ShiftyTR/KxDaili/Ihuan/Prxchk: 1.5`; high-volume low-quality sources `Geonode/Jetkai/B4RC0DE/OpenProxyList/Proxy4Parsing: 0.5`. Higher weight means a higher initial score and an earlier first probe.
 
 > A bigger cap is not better. The ceiling on `fresh` is roughly probe throughput × usable rate × freshness window, and has nothing to do with pool size: raise the cap and every proxy simply waits longer between re-probes, so the extra proxies only dilute the probing.
 
@@ -314,6 +318,7 @@ proxyproof/
   processors/   getter / tester / server
   crawlers/     26 proxy sources, one file per source under public/
   schemas/      Proxy
+  utils/        cn_ip.py (mainland-China IP check, used by CN_ONLY)
   setting.py    all configuration
 tests/                  smoke tests (pytest)
 tools/

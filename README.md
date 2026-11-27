@@ -200,7 +200,7 @@ GET http://localhost:5555/stats
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
-| `APP_ENV` | `dev` | 可选 `dev` / `test` / `prod` |
+| `APP_ENV` | `dev` | `dev`（DEBUG 日志）/ `test`（INFO 日志，推荐日常用）/ `prod`（ERROR） |
 | `APP_DEBUG` | `dev` 下为 `true` | Flask 调试模式 |
 | `APP_PROD_METHOD` | `gevent` | `prod` 下的 WSGI 容器：`gevent` / `tornado` / `meinheld`（后两者需自行安装） |
 
@@ -234,11 +234,15 @@ GET http://localhost:5555/stats
 |---|---|---|
 | `PROXY_NUMBER_MAX` | `3000` | 池子上限 |
 | `PROXY_SCORE_INIT` | `10` | 新代理入池初始分 |
+| `SOURCE_WEIGHTS` | 见下 | 按来源加权（好源初始分高、首检排前面） |
+| `CN_ONLY` | `false` | `true` 时只收国内段 IP（源头过滤） |
 | `INTRODUCE_WINDOW` | `900` | 新代理首次检测打散窗口（秒） |
 | `CYCLE_TESTER` | `20` | 检测器每轮的时间预算（秒） |
 | `CYCLE_GETTER` | `300` | 抓取周期（秒） |
 | `PROBE_MAX_AGE` | `120` | 分发新鲜度闸门（秒），建议 ≥ OK 复检间隔（30s） |
 | `GET_TIMEOUT` | `10` | 爬虫请求超时 |
+
+`SOURCE_WEIGHTS` 默认值（JSON，可覆盖）：好源 `AdvancedNameCrawler: 2.5`、`ShiftyTR/KxDaili/Ihuan/Prxchk: 1.5`，高产低质源 `Geonode/Jetkai/B4RC0DE/OpenProxyList/Proxy4Parsing: 0.5`。权重越大，初始分越高、首检排得越靠前。
 
 > 上限不是越大越好。`fresh` 的天花板 ≈ 检测吞吐 × 可用率 × 新鲜窗口，和池子大小无关：上限调大之后，每个代理被复检的间隔会跟着变长，多出来的代理只会摊薄检测频率。
 
@@ -343,6 +347,7 @@ proxyproof/
   processors/   getter / tester / server
   crawlers/     26 个代理源，public/ 下每个文件一个源
   schemas/      Proxy
+  utils/        cn_ip.py（国内段判断，CN_ONLY 用）
   setting.py    全部配置
 tests/                  冒烟测试（pytest）
 tools/
