@@ -43,10 +43,14 @@ class Tester:
         return popped
 
     async def _run_once(self, budget=CYCLE_TESTER):
-        budget_until = time.time() + max(5, budget - 2)
         total = 0
-        for key in self.keys:
+        keys = self.keys
+        per_key = max(3, (budget - 2) / len(keys)) if keys else budget
+        # 每个 key 一轮的预算均分：否则第一个 key 会把整轮时间吃光，
+        # 后序 key 永远分不到探测时间（多目标时 zongheng 饿死就是这个原因）
+        for key in keys:
             self.pool.ensure_key(key)
+            budget_until = time.time() + per_key
             # 只有 due 队列空、池里却有代理时才可能是崩溃丢任务；频率限制到 5 分钟一次，
             # 否则每轮都会对全池做一次 ZSCAN
             if (self.pool.due_size(key) == 0 and self.pool.count(key) > 0

@@ -58,6 +58,9 @@ PROXY_SCORE_INIT = env.int('PROXY_SCORE_INIT', 10)
 
 # definition of proxy number
 PROXY_NUMBER_MAX = env.int('PROXY_NUMBER_MAX', 3000)
+# 只收国内 IP：开启后 getter 直接丢弃海外段代理，整个池子只服务国内站。
+# 对淘宝/拼多多这类按 IP 段封机房地址的站，海外代理毫无价值还占探测配额
+CN_ONLY = env.bool('CN_ONLY', False)
 
 # definition of tester cycle, it will test every CYCLE_TESTER second
 CYCLE_TESTER = env.int('CYCLE_TESTER', 20)

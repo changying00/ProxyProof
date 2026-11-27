@@ -38,7 +38,7 @@ async def main():
     # 对 5555 的请求也丢给 Clash，Clash 拒连回环地址 → 报一堆看不懂的错误）
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        stats = json.loads(opener.open(POOL_API + '/stats', timeout=8).read())
+        json.loads(opener.open(POOL_API + '/stats', timeout=8).read())
         proxies = opener.open(POOL_API + '/all?max_age=300', timeout=8).read().decode().splitlines()
     except OSError as e:
         print(f'连不上代理池 {POOL_API}：{e}')

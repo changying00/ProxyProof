@@ -3,8 +3,9 @@ from loguru import logger
 
 from proxyproof.crawlers import __all__ as crawlers_cls
 from proxyproof.probe.endpoint import all_keys
-from proxyproof.setting import PROXY_NUMBER_MAX
+from proxyproof.setting import CN_ONLY, PROXY_NUMBER_MAX
 from proxyproof.storages.pool import Pool
+from proxyproof.utils.cn_ip import is_cn
 
 
 class Getter:
@@ -32,7 +33,15 @@ class Getter:
                 for proxy in crawler.crawl():
                     if self.is_full():
                         break
+                    # CN_ONLY 全局开关：整个池子只收国内 IP（源头过滤，
+                    # 海外机房代理连抓都不用抓进池，探测配额全留给国内段）
+                    if CN_ONLY and not is_cn(proxy.host):
+                        continue
                     for key in self.keys:
+                        # cn 开头的 key 是国内站专用池：只收国内段 IP，
+                        # 海外机房代理进国内池只会被墙，白占探测和存储
+                        if key.startswith('cn') and not is_cn(proxy.host):
+                            continue
                         if self.pool.add(proxy.string(), key, src=name):
                             n += 1
             except Exception as e:
