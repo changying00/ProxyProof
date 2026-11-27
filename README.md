@@ -20,7 +20,7 @@ $ curl localhost:5555/stats             # 池子现状
 
 `fresh` 是「最近 `PROBE_MAX_AGE` 秒内确认可用」的数量，`/random` 只从这里取。一个都没有时返回 `503`，不会拿没验证过的代理凑数。
 
-- 26 个免费代理源定时抓取，Redis 存储，HTTP API 取用（`/random` `/all` `/count` `/stats` `/report`）
+- 33 个免费代理源定时抓取，Redis 存储，HTTP API 取用（`/random` `/all` `/count` `/stats` `/report`）
 - 按目标站点分别记分，判定分四态，只发最近确认过能用的代理
 - 探测走漏斗（TCP → 身份 → 目标），死代理 0.8 秒出局；默认探针是 Cloudflare 的连通性端点，不给任何站点添负担
 
@@ -367,10 +367,12 @@ class ExampleCrawler(BaseCrawler):
 
 ### 现有源的情况
 
-26 个源里产量和可用率差得很远（实测）：
+33 个源里产量和可用率差得很远（实测）：
 
 | 类型 | 代表 | 说明 |
 |---|---|---|
+| **高匿专供** | Thordata、VPSLab、Proxmint、RelayGlass | 只抓 elite/anonymous 列表，277~917 条，质量最高 |
+| **高匿大池** | Madeval、FusionProxies、Litportnet | 带匿名等级标签/合并去重，1400~8400 条 |
 | 高产低质 | OpenProxyList、Proxy4Parsing、Geonode、Jetkai、B4RC0DE | 单轮 3000~10000 条，可用率 0.2%~1.4% |
 | 高质量 | AdvancedName | 只有 300 条，可用率 12% |
 | 少量 | ShiftyTR、KxDaili、Ihuan、Prxchk | 几十条 |
@@ -396,7 +398,7 @@ proxyproof/
   probe/        四态判定规则、探测端点、漏斗探测
   storages/     池存储（ZSET + hash + 新鲜度索引）
   processors/   getter / tester / server
-  crawlers/     26 个代理源，public/ 下每个文件一个源
+  crawlers/     33 个代理源，public/ 下每个文件一个源
   schemas/      Proxy
   utils/        cn_ip.py（国内段判断，CN_ONLY 用）
   setting.py    全部配置
@@ -416,7 +418,7 @@ ruff.toml · pytest.ini  lint 与测试配置
 
 **保留的部分**
 
-- `BaseCrawler` / `TextListCrawler` 爬虫框架与自动注册机制（26 个源都是这个模式）
+- `BaseCrawler` / `TextListCrawler` 爬虫框架与自动注册机制（33 个源都是这个模式）
 - 用 Redis 有序集合存储代理的基本思路
 - `/random`、`/count`、`/all` 的 API 形态
 

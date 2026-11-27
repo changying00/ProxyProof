@@ -20,7 +20,7 @@ $ curl localhost:5555/stats             # state of the pool
 
 `fresh` counts the proxies confirmed usable within the last `PROBE_MAX_AGE` seconds, and `/random` hands out nothing else. When there are none it returns `503` instead of an unverified proxy.
 
-- Crawls 26 public proxy sources on a schedule, stores them in Redis, serves them over HTTP (`/random` `/all` `/count` `/stats` `/report`)
+- Crawls 33 public proxy sources on a schedule, stores them in Redis, serves them over HTTP (`/random` `/all` `/count` `/stats` `/report`)
 - Scores each proxy per target site with a four-state verdict; only recently confirmed proxies are served
 - Probes through a funnel (TCP → identity → target), so a dead proxy is out in 0.8 s. The default probe is Cloudflare's connectivity endpoint, which costs nobody any bandwidth
 
@@ -335,10 +335,12 @@ Crawler requests never use the system proxy (`trust_env=False`), so the results 
 
 ### The current sources
 
-Yield and usable rate vary widely across the 26 sources (measured):
+Yield and usable rate vary widely across the 33 sources (measured):
 
 | Type | Examples | Notes |
 |---|---|---|
+| **High-anon dedicated** | Thordata, VPSLab, Proxmint, RelayGlass | elite/anonymous lists only, 277–917 proxies, best quality |
+| **High-anon large pool** | Madeval, FusionProxies, Litportnet | anonymity labels / dedup-merged, 1,400–8,400 proxies |
 | High volume, low quality | OpenProxyList, Proxy4Parsing, Geonode, Jetkai, B4RC0DE | 3,000–10,000 per round, 0.2%–1.4% usable |
 | High quality | AdvancedName | only 300 proxies, 12% usable |
 | Small | ShiftyTR, KxDaili, Ihuan, Prxchk | a few dozen |
@@ -364,7 +366,7 @@ proxyproof/
   probe/        four-state verdict rules, probe endpoints, funnel probing
   storages/     pool storage (ZSET + hash + freshness index)
   processors/   getter / tester / server
-  crawlers/     26 proxy sources, one file per source under public/
+  crawlers/     33 proxy sources, one file per source under public/
   schemas/      Proxy
   utils/        cn_ip.py (mainland-China IP check, used by CN_ONLY)
   setting.py    all configuration
@@ -384,7 +386,7 @@ This project is derived from **[Python3WebSpider/ProxyPool](https://github.com/P
 
 **Kept from the original**
 
-- The `BaseCrawler` / `TextListCrawler` framework and automatic registration (all 26 sources use it)
+- The `BaseCrawler` / `TextListCrawler` framework and automatic registration (all 33 sources use it)
 - The idea of storing proxies in a Redis sorted set
 - The shape of the `/random`, `/count` and `/all` API
 

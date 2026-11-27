@@ -59,10 +59,17 @@ PROXY_SCORE_INIT = env.int('PROXY_SCORE_INIT', 10)
 # 高产低质源 0.2%~1.4%）。没列出的源权重 1.0
 SOURCE_WEIGHTS = env.json('SOURCE_WEIGHTS', {
     'AdvancedNameCrawler': 2.5,
+    'ThordataCrawler': 2.5,       # elite 高匿专用列表
+    'VPSLabCrawler': 2.5,         # elite 高匿专用列表
+    'ProxmintCrawler': 2.0,       # elite 高匿（带在线率）
+    'RelayGlassCrawler': 2.0,     # elite HTTP（每 5 分钟验证）
+    'LitportnetCrawler': 2.0,     # 带延迟/在线率元数据
+    'MadevalCrawler': 1.8,        # 1M+ 池，elite/anonymous 标签
     'ShiftyTRCrawler': 1.5,
     'KxDailiCrawler': 1.5,
     'IhuanCrawler': 1.5,
     'PrxchkCrawler': 1.5,
+    'FusionProxiesCrawler': 1.2,  # 5 源合并去重
     'OpenProxyListCrawler': 0.5,
     'Proxy4ParsingCrawler': 0.5,
     'GeonodeCrawler': 0.5,
