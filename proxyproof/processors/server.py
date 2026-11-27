@@ -5,6 +5,7 @@ import re
 from flask import Flask, abort, jsonify, request
 from loguru import logger
 
+from proxyproof import __version__
 from proxyproof.exceptions import PoolEmptyException
 from proxyproof.probe.endpoint import all_keys
 from proxyproof.setting import API_HOST, API_KEY, API_PORT, API_THREADED, IS_DEV, PROBE_MAX_AGE
@@ -65,7 +66,7 @@ def health():
 @app.route('/')
 @auth_required
 def index():
-    return '<h2>Welcome to Proxy Pool System</h2>'
+    return f'<h2>Welcome to Proxy Pool System</h2><p>version {__version__}</p>'
 
 
 @app.route('/random')
