@@ -8,6 +8,8 @@
 用的 API 需返回 JSON，且至少包含 ip、country 字段。
 推荐 ip-api.com（免费，45次/分钟）或 ipinfo.io（免费，5万/月）。
 """
+from __future__ import annotations
+
 import time
 
 import requests
