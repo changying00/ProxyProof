@@ -32,7 +32,7 @@ def report(proxy, ok, key=KEY):
 
 
 def crawl(url, proxy):
-    p = {'http': f'http://{proxy}', 'https': f'http://{proxy}'}
+    p = {'http': f'http://{proxy}'}
     return requests.get(url, proxies=p, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
 
 

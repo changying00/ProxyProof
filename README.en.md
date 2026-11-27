@@ -103,7 +103,7 @@ def get_random_proxy():
     return r.text.strip()
 
 def crawl(url, proxy):
-    proxies = {'http': 'http://' + proxy, 'https': 'http://' + proxy}
+    proxies = {'http': 'http://' + proxy}
     return requests.get(url, proxies=proxies, timeout=10).text
 
 
